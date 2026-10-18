@@ -2,6 +2,7 @@ package dev.kaede.pixelboard;
 
 import android.util.Log;
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 /**
@@ -28,7 +29,28 @@ public final class WritingToolsDiagnostics {
                 Log.i(TAG, "WritingTools target absent/incompatible: " + target);
             }
         }
+        probeSignals(loader);
         Log.i(TAG, "WritingTools 18.0.3 probe: " + matched + "/" + targets.length
                 + " signatures found; no initialization/signal hooks installed");
+    }
+    private static void probeSignals(ClassLoader loader) {
+        // PixelBoard runtime targets. Resolve identity without reading or changing results.
+        String[][] specs = {{"gvu", "a"}, {"lvi", "b"}, {"gqd", "a"}};
+        for (String[] spec : specs) {
+            try {
+                Class<?> owner = Class.forName(spec[0], false, loader);
+                Field field = owner.getDeclaredField(spec[1]);
+                if (!Modifier.isStatic(field.getModifiers())) {
+                    Log.i(TAG, "WritingTools signal rejected non-static: " + spec[0] + "#" + spec[1]);
+                    continue;
+                }
+                field.setAccessible(true);
+                Object signal = field.get(null);
+                Log.i(TAG, "WritingTools signal candidate: " + spec[0] + "#" + spec[1]
+                        + " present=" + (signal != null));
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                Log.i(TAG, "WritingTools signal unavailable: " + spec[0] + "#" + spec[1]);
+            }
+        }
     }
 }
