@@ -136,6 +136,11 @@ public final class AiCoreProbeActivity extends Activity {
         appendPackage(text, "Astrea / Private Compute Services", "com.google.android.as.oss");
         appendAstreaService(text);
         appendBindingReport(text);
+        WritingToolsBackendCheck.Result prerequisites = WritingToolsBackendCheck.check(this,
+                settings.getInt("writing_tools_backend", 2));
+        text.append("\nV2 绑定预检：").append(prerequisites.code)
+                .append("\n").append(prerequisites.message)
+                .append("\n最终生效模式仍以 Gboard 进程启动日志为准。");
         text.append("\n注意：官方文档不支持解锁 Bootloader 的设备；"
                 + "服务初始化、机型、语言和模型配置也会影响结果。\n");
         return text.toString();

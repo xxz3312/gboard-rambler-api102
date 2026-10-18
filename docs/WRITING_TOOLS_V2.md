@@ -86,3 +86,26 @@ su -c 'logcat -b all -d -v threadtime -s PixelBoardLS' | tail -n 120
 
 The optional public API probe is labelled 607/614 and does not switch backends,
 start inference or prove that Gboard Feature 703 works.
+
+## 0.1.9 binding guard
+
+The user tested 0.1.8 with AICore selected and reported that Writing Tools became
+unavailable. The supplied report still shows Gboard missing the service's
+BIND_SERVICE permission. Public API features 607/614 remain unavailable; no
+real V2 session log has yet been supplied.
+
+0.1.9 checks the selected service declaration, enabled/exported state and
+Gboard's actual grant before applying any V2/backend flags. If these prerequisites
+fail or cannot be verified, the Gboard process keeps the 0.1.7 basic cloud
+policy for its entire lifetime. The app shows the reason, and logs distinguish
+requestedBackend from effectiveBackend. Restart all affected processes after
+installing or changing settings; already running hooks cannot be removed by a
+preference update alone.
+
+Backend package hooks also remain inactive when the binding check is blocked.
+Astrea is checked against its own exported service and permission declaration;
+an absent AICore grant does not by itself block the Astrea choice.
+
+This guard prevents the known configuration failure. It does not grant a
+permission, bypass system security, fix missing models or repair the remote
+INVALID_ARGUMENT result. A successful preflight is not a successful RPC.

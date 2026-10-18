@@ -31,7 +31,7 @@ public final class SettingsActivity extends Activity {
         addToggle(list, "writing_tools_v2", "Writing Tools V2 · 实验模式",
                 "需同时开启 AI 写作工具。仅适配 Gboard 18.4.1.985164140（176027078）。"
                 + "可能触发官方模型准备或下载，需要完成 Gboard 自身的使用同意。"
-                + "后端不可用时，关闭本开关并重启 Gboard 即可恢复基础云端模式。");
+                + "缺少服务绑定权限时自动保留基础云端模式；其他不可用情况可关闭本开关并重启 Gboard 恢复。");
         addText(list, "V2 后端（仅实验模式生效）", true);
         android.widget.RadioGroup backends = new android.widget.RadioGroup(this);
         android.widget.RadioButton aicore = new android.widget.RadioButton(this);
@@ -43,11 +43,17 @@ public final class SettingsActivity extends Activity {
         backends.addView(aicore);
         backends.addView(astrea);
         backends.check(prefs.getInt("writing_tools_backend", 2) == 3 ? astrea.getId() : aicore.getId());
+        TextView prerequisites = new TextView(this);
+        prerequisites.setText(WritingToolsBackendCheck.check(this,
+                prefs.getInt("writing_tools_backend", 2)).message);
         backends.setOnCheckedChangeListener((group, id) -> {
             prefs.edit().putInt("writing_tools_backend", id == astrea.getId() ? 3 : 2).apply();
             ((ModuleApp) getApplication()).sync();
+            prerequisites.setText(WritingToolsBackendCheck.check(this,
+                    prefs.getInt("writing_tools_backend", 2)).message);
         });
         list.addView(backends);
+        list.addView(prerequisites);
         addText(list, "实验作用域：Gboard、AICore、Private Compute Services。"
                 + "关闭 V2 时，不修改 AICore/Astrea。选择后端只改变请求路径，不代表模型、账号或服务已可用。", false);
         android.widget.Button status = new android.widget.Button(this);

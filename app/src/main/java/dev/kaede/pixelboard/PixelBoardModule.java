@@ -21,6 +21,7 @@ public final class PixelBoardModule extends XposedModule {
     private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
     private volatile boolean verifiedWritingTools184;
     private volatile boolean verifiedV2;
+    private volatile boolean v2CanAttempt;
     private volatile Context hostContext;
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
@@ -85,12 +86,15 @@ public final class PixelBoardModule extends XposedModule {
                 if (arg instanceof Context && packageName.equals(((Context) arg).getPackageName())
                         && bootstrapped.compareAndSet(false, true)) {
                     FeatureConfig.initialize(this);
-                    if (FeatureConfig.writingToolsV2()) {
+                    WritingToolsBackendCheck.Result prerequisites = FeatureConfig.writingToolsV2()
+                            ? WritingToolsBackendCheck.check((Context) arg, FeatureConfig.writingToolsBackend()) : null;
+                    if (prerequisites != null && prerequisites.canAttempt) {
                         try { installExperimentalBackend(packageName, loader, (Context) arg); }
                         catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
                             Log.w(TAG, "V2 backend package hook skipped: " + packageName, e);
                         }
-                    } else Log.i(TAG, "V2 disabled; backend process retained stock behavior");
+                    } else Log.i(TAG, "V2 backend process retained stock behavior; reason="
+                            + (prerequisites == null ? "V2_DISABLED" : prerequisites.code));
                 }
                 return result;
             });
@@ -269,14 +273,24 @@ public final class PixelBoardModule extends XposedModule {
               + "; Rambler=" + FeatureConfig.rambler()
               + "; diagnostics=" + FeatureConfig.diagnostics());
         verifiedV2 = verifiedWritingTools184 && resolveV2Profile(loader);
-        if (FeatureConfig.writingToolsV2() && !verifiedV2)
-            Log.w(TAG, "V2 requested but exact Gboard profile unsupported; basic cloud policy retained");
+        v2CanAttempt = false;
+        if (FeatureConfig.writingToolsV2()) {
+            if (!verifiedV2) {
+                Log.w(TAG, "V2 blocked=GBOARD_PROFILE_UNSUPPORTED; basic cloud policy retained");
+            } else {
+                WritingToolsBackendCheck.Result prerequisites = WritingToolsBackendCheck.check(
+                        context, FeatureConfig.writingToolsBackend());
+                v2CanAttempt = prerequisites.canAttempt;
+                Log.i(TAG, "V2 binding preflight: canAttempt=" + v2CanAttempt
+                        + " reason=" + prerequisites.code + "; " + prerequisites.message);
+            }
+        }
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
         if (FeatureConfig.writingTools()) {
             WritingToolsDiagnostics.probe(loader);
             if ((FeatureConfig.diagnostics() || FeatureConfig.writingToolsV2()) && verifiedWritingTools184)
                 observeWritingTools184State(loader);
-            if (FeatureConfig.writingToolsV2() && verifiedV2) observeV2Backend(loader);
+            if (v2CanAttempt) observeV2Backend(loader);
         }
         RamblerBindings.Profile voiceProfile = null;
         if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) {
@@ -292,9 +306,10 @@ public final class PixelBoardModule extends XposedModule {
             else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
         }
         if (FeatureConfig.writingTools()) {
-            boolean v2 = FeatureConfig.writingToolsV2() && verifiedV2;
+            boolean v2 = v2CanAttempt;
             Log.i(TAG, "Writing Tools policy=" + (v2 ? "v2-backends-experiment" : "basic-cloud-v2")
-                    + "; V2=" + v2 + "; requestedBackend=" + (v2 ? FeatureConfig.writingToolsBackend() : 1)
+                    + "; V2=" + v2 + "; effectiveBackend=" + (v2 ? FeatureConfig.writingToolsBackend() : 1)
+                    + "; requestedBackend=" + FeatureConfig.writingToolsBackend()
                     + "; real provisioning/consent/account checks retained");
         }
     }
@@ -368,7 +383,7 @@ public final class PixelBoardModule extends XposedModule {
                     Object writingResult = "writing_tools_enable_stable_entrance".equals(flag)
                             && !verifiedWritingTools184 ? original
                             : WritingToolsFlagPolicy.overrideValue(flag, original, FeatureConfig.writingTools(),
-                                    verifiedV2 && FeatureConfig.writingToolsV2(), FeatureConfig.writingToolsBackend());
+                                    v2CanAttempt, FeatureConfig.writingToolsBackend());
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.isToolbarFlag(flag)) {
                         int reads = writingToolbarReadCount.incrementAndGet();
                         if (reads <= 5)
