@@ -37,7 +37,7 @@ public final class RamblerFlagPolicy {
                 || "ad_activation_type".equals(name);
     }
     public static Object transform(String name, Object original, Context context) {
-        if (!FeatureConfig.ENABLE_RAMBLER || name == null || context == null) return original;
+        if (!FeatureConfig.rambler() || name == null || context == null) return original;
         // Respect explicit opt-out across all flags, including activation type and settings.
         if (!RamblerSelection.mayExpose(context)) return original;
         if ("show_rambler_dict_settings".equals(name))

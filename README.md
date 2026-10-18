@@ -1,12 +1,11 @@
 # Gboard Rambler — LSPosed API 102
 
-Experimental Modern LSPosed port of selected [PixelBoard](https://github.com/Akshayykadam/PixelBoard) features (GPL-3.0).
+Experimental runtime port based on [PixelBoard](https://github.com/Akshayykadam/PixelBoard), GPL-3.0.
 
-**Current state: uncompiled, no APK, not verified working.** Rambler feature flag hook scaffolding is present but disabled; feature activation is unconfirmed. Writing Tools has a read-only typed flag inventory and 18.0.3 candidate method bindings only; **no Writing Tools hooks are installed**. All experimental toggles remain false.
+## Test configuration UI (source only)
 
-- [Rambler port notes](docs/RAMBLER_PORT.md)
-- [Writing Tools port notes](docs/WRITING_TOOLS_PORT.md)
-- [Validation checklist](docs/VALIDATION.md)
-- [Porting overview](docs/PORTING.md)
+The new launcher SettingsActivity stores separate experimental toggles for Rambler, inline spellchecker, diagnostic hooks and a future Writing Tools implementation. Gboard reads the toggles from the module's read-only ContentProvider at process startup. Restart the Gboard process after changing toggles.
 
-GitHub Actions runs only manually via `workflow_dispatch`; commits do not trigger builds. Attribution: Akshay Kadam and PixelBoard contributors. GPL-3.0.
+**Uncompiled, untested.** Rambler cannot be claimed functional; Writing Tools has no hooks. Logcat tag: `PixelBoardLS`. [Testing instructions](docs/TESTING.md).
+
+GitHub Actions builds are manual only; no build or release was triggered.

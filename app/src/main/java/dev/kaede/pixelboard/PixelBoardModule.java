@@ -16,11 +16,12 @@ public final class PixelBoardModule extends XposedModule {
         if (!GBOARD.equals(param.getPackageName())) return;
         ClassLoader loader = param.getClassLoader();
         if (loader == null) { Log.w(TAG, "No Gboard classloader"); return; }
+        FeatureConfig.initialize(GboardContext.current());
         Log.i(TAG, "Attached to Gboard on SDK " + Build.VERSION.SDK_INT);
-        if (FeatureConfig.ENABLE_INLINE_SPELLCHECKER) installSpellChecker(loader);
-        if (FeatureConfig.ENABLE_RAMBLER || FeatureConfig.ENABLE_DIAGNOSTIC_HOOKS)
+        if (FeatureConfig.spellchecker()) installSpellChecker(loader);
+        if (FeatureConfig.rambler() || FeatureConfig.diagnostics())
             installRambler(loader);
-        if (FeatureConfig.ENABLE_WRITING_TOOLS)
+        if (FeatureConfig.writingTools())
             Log.w(TAG, "Writing Tools not implemented; skipping");
     }
 
@@ -34,7 +35,7 @@ public final class PixelBoardModule extends XposedModule {
         hookScope(profile.defaults, loader, true);
         observeSelectionRead(profile.read, loader);
         observeSelectionWrite(profile.write, loader);
-        if (FeatureConfig.ENABLE_RAMBLER) installFlagGetter(loader, profile.id);
+        if (FeatureConfig.rambler()) installFlagGetter(loader, profile.id);
     }
 
     private void hookScope(TargetMethod target, ClassLoader loader, boolean defaults) {
@@ -71,7 +72,7 @@ public final class PixelBoardModule extends XposedModule {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
-                if (FeatureConfig.ENABLE_DIAGNOSTIC_HOOKS)
+                if (FeatureConfig.diagnostics())
                     Log.d(TAG, "Official selector write completed (no forced selection)");
                 return result;
             });

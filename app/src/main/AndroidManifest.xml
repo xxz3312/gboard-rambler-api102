@@ -1,3 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <application android:label="PixelBoard LSPosed" android:description="@string/module_description" android:hasCode="true" android:allowBackup="false" android:extractNativeLibs="false" />
+    <application android:label="Gboard Rambler API102" android:description="@string/module_description" android:allowBackup="false">
+        <activity android:name=".SettingsActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <provider android:name=".ConfigProvider" android:authorities="dev.kaede.pixelboard.config" android:exported="true"/>
+    </application>
 </manifest>
