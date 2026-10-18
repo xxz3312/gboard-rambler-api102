@@ -5,6 +5,7 @@ import android.app.Application;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import android.os.Build;
+import android.content.pm.PackageInfo;
 import android.util.Log;
 import java.lang.reflect.Method;
 import io.github.libxposed.api.XposedModule;
@@ -51,6 +52,13 @@ public final class PixelBoardModule extends XposedModule {
 
     private void initializeForGboard(ClassLoader loader, Context context) {
         FeatureConfig.initialize(this);
+        try {
+            PackageInfo pkg = context.getPackageManager().getPackageInfo(GBOARD, 0);
+            Log.i(TAG, "Target Gboard version=" + pkg.versionName
+                    + ", versionCode=" + pkg.getLongVersionCode());
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "Gboard package version unavailable", e);
+        }
         Log.i(TAG, "Gboard Application Context available; SDK " + Build.VERSION.SDK_INT
               + "; Rambler=" + FeatureConfig.rambler()
               + "; diagnostics=" + FeatureConfig.diagnostics());
@@ -70,7 +78,7 @@ public final class PixelBoardModule extends XposedModule {
             else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
         }
         if (FeatureConfig.writingTools())
-            Log.i(TAG, "Writing Tools runtime flag policy active; toolbar/backend unverified");
+            Log.i(TAG, "Writing Tools experimental flag policy requested; actual binding and toolbar/backend require verification");
     }
 
     private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
