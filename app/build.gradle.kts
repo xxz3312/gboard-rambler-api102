@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.1.12-live-probe"
+        versionCode = 14
+        versionName = "0.1.13-astrea-errors"
     }
     buildFeatures { buildConfig = true }
     buildTypes {

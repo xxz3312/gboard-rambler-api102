@@ -273,6 +273,7 @@ public final class PixelBoardModule extends XposedModule {
             } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
                 recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED", "PANEL_STATUS_OBSERVER_UNAVAILABLE");
             }
+            observeAstreaErrors(loader);
             observeV2Availability(loader);
             recordStatus(hostContext, "V2_DIAGNOSTICS_READY", "route session response availability");
             Log.i(TAG, "V2 route/session/response observers installed; no text logged");
@@ -282,6 +283,42 @@ public final class PixelBoardModule extends XposedModule {
         }
     }
 
+
+
+    private void observeAstreaErrors(ClassLoader loader) {
+        try {
+            Method error = new TargetMethod("oju", "k", "xin",
+                    "java.lang.Throwable", "java.lang.String").resolve(loader);
+            Method statusFromThrowable = new TargetMethod("abdv", "c", "abdv",
+                    "java.lang.Throwable").resolve(loader);
+            java.lang.reflect.Field code = Class.forName("abdv", false, loader).getDeclaredField("n");
+            if (!"abds".equals(code.getType().getName())) throw new NoSuchFieldException("gRPC code");
+            code.setAccessible(true);
+            AtomicInteger errors = new AtomicInteger();
+            hook(error).intercept(chain -> {
+                // Read metadata before the original handler folds it into INTERNAL_ERROR.
+                // Never log exception messages, operation strings or input/output text.
+                try {
+                    if (!chain.getArgs().isEmpty() && chain.getArgs().get(0) instanceof Throwable
+                            && errors.incrementAndGet() <= 24) {
+                        Throwable failure = (Throwable) chain.getArgs().get(0);
+                        Object status = statusFromThrowable.invoke(null, failure);
+                        recordStatus(hostContext, "V2_ASTREA_ERROR",
+                                "rpc=" + enumName(code.get(status)) + " "
+                                + RuntimeErrorMetadata.describe(failure));
+                    }
+                } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                    recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED",
+                            "astrea_error_metadata=" + e.getClass().getSimpleName());
+                }
+                return chain.proceed();
+            });
+            recordStatus(hostContext, "V2_DIAGNOSTICS_READY", "astrea_rpc_error_observer");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED",
+                    "astrea_error_observer=" + e.getClass().getSimpleName());
+        }
+    }
 
     private void observeV2Availability(ClassLoader loader) {
         try {

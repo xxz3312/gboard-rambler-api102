@@ -209,3 +209,15 @@ The optional Root reload button runs only on a user tap and stops the three fixe
 packages. Its exit status is displayed; it does not claim that a new module is loaded.
 Use the settings test editor to start Gboard, then request a live reply. No input text is
 included in diagnostic broadcasts. Model readiness, consent and backend policy are unchanged.
+
+## 0.1.13 Astrea error diagnostics
+
+Inspection of the supplied Gboard 176027078 APK confirms that oju.b(Context)
+returns readiness from a feature flag without performing an RPC. READY therefore
+does not validate binding, credentials, network access or generation.
+
+Observe the original oju.k(Throwable, String) error handler before it maps failures
+to PRIVATE_INFERENCE_INTERNAL_ERROR. Extract only the gRPC status enum through the
+same abdv.c(Throwable) adapter used by Gboard, and up to four cause class names.
+Never log exception messages, operation arguments, request text or credentials.
+The original handler and its returned future remain unchanged.

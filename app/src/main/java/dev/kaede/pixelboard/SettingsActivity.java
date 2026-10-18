@@ -157,6 +157,8 @@ public final class SettingsActivity extends Activity {
                 + "\n本次实时查询：\n" + (!reply.isEmpty() ? reply
                         : requested ? "尚未收到本次应答；不能据此判定未注入。"
                         : "尚未查询。请唤起 Gboard 后点击实时查询。")
+                + (prefs.getInt("writing_tools_backend", 2) == 3
+                        ? "\nAstrea READY 仅为前置开关检查；请以实际请求的 V2_RESPONSE / V2_ASTREA_ERROR 为准。" : "")
                 + "\n当前版本启动事件：\n" + (attached.isEmpty() ? "尚未收到。" : attached)
                 + "\nRoot 重载结果：\n" + runtimePrefs.getString("reload_result", "尚未执行。")
                 + "\n当前模块版本最近 40 条事件：\n"
