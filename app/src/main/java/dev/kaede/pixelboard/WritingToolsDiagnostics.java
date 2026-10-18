@@ -65,7 +65,9 @@ public final class WritingToolsDiagnostics {
 
     private static void probeSignals(ClassLoader loader) {
         // PixelBoard runtime targets. Resolve identity without reading or changing results.
-        // On 18.4.1, lvi#b is a long field, not a signal object.\n        // gqd#a was not verified; do not treat it as a forced signal.\n        String[][] specs = {{"gvu", "a"}};
+        // On 18.4.1, lvi#b is a long field, not a signal object.
+        // gqd#a was not verified; do not treat it as a forced signal.
+        String[][] specs = {{"gvu", "a"}};
         for (String[] spec : specs) {
             try {
                 Class<?> owner = Class.forName(spec[0], false, loader);
