@@ -18,6 +18,7 @@ public final class PixelBoardModule extends XposedModule {
 
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
     private final AtomicInteger writingFlagLogCount = new AtomicInteger(0);
+    private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
     private volatile Context hostContext;
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
@@ -80,7 +81,7 @@ public final class PixelBoardModule extends XposedModule {
             else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
         }
         if (FeatureConfig.writingTools())
-            Log.i(TAG, "Writing Tools experimental flag policy requested; actual binding and toolbar/backend require verification");
+            Log.i(TAG, "Writing Tools experimental override installed only if shared getter was resolved; toolbar is not guaranteed");
     }
 
     private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
@@ -150,6 +151,12 @@ public final class PixelBoardModule extends XposedModule {
                         return original;
                     // Use the Gboard-owned attach context, avoiding early ActivityThread nulls.
                     Object writingResult = WritingToolsFlagPolicy.transform(flag, original, context);
+                    if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.isToolbarFlag(flag)) {
+                        int reads = writingToolbarReadCount.incrementAndGet();
+                        if (reads <= 5)
+                            Log.i(TAG, "WritingTools toolbar gate READ #" + reads
+                                    + " changed=" + !java.util.Objects.equals(original, writingResult));
+                    }
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.targeted(flag)
                             && writingFlagLogCount.incrementAndGet() <= 40) {
                         Log.i(TAG, "WritingTools flag observed: " + flag
