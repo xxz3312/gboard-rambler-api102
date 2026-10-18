@@ -1,8 +1,10 @@
-name: Android CI (manual only)
+name: Debug verification
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 jobs:
-  build:
+  debug:
     runs-on: ubuntu-latest
     permissions: {contents: read}
     steps:
@@ -12,8 +14,9 @@ jobs:
       - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.10.2'}
-      - run: gradle :app:assembleDebug :app:assembleRelease --no-daemon
+      - run: gradle :app:assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
-          name: pixelboard-lsposed-apks
-          path: app/build/outputs/apk/**/*.apk
+          name: gboard-rambler-debug
+          path: app/build/outputs/apk/debug/*.apk
