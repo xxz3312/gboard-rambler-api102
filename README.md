@@ -1,11 +1,20 @@
-# PixelBoard LSPosed (API 102)
+# PixelBoard LSPosed — API 102
 
-Experimental Modern LSPosed module for official Gboard (`com.google.android.inputmethod.latin`), inspired by [PixelBoard](https://github.com/Akshayykadam/PixelBoard).
+Experimental Modern LSPosed port for official Google Gboard, based on design and target mappings documented by [Akshayykadam/PixelBoard](https://github.com/Akshayykadam/PixelBoard) (GPL-3.0).
 
-**Status:** initial scaffold, not a feature-complete port. The spellchecker hook is opt-in and untested. Rambler, Writing Tools, static DEX patching, manifest and resource patches are not implemented.
+## Current status
 
-Build with JDK 17, Android SDK 35, Gradle 8.10.2: `gradle :app:assembleDebug`.
+- API 102 module scaffold, static Gboard scope and Gradle source configuration.
+- Exact-reflection target signatures and fail-closed 18.0.3 / 18.3.1 / 18.4.1 Rambler mapping detection.
+- Reentrant, exception-safe voice-settings / default-selection scopes and non-mutating selection observers.
+- Experimental spellchecker boolean gate; **disabled**.
+- No genuine Rambler activation, AI Writing Tools, resource/manifest rewriting, or runtime DEX replacement yet.
+- All hooks **disabled by default**, including diagnostics; installing this project alone does not enable AI features.
 
-Uses `io.github.libxposed:api:102.0.0`. Does not modify Gboard APK or guarantee server-side feature eligibility.
+## No-build development mode
 
-Licensed under GPL-3.0; retain upstream attribution for any subsequently ported code.
+GitHub Actions triggers **only** via the manual `workflow_dispatch` action. Code commits do not build an APK. Do not enable switches until validating exact Gboard dex signatures and runtime behavior.
+
+## Attribution and license
+
+PixelBoard target mapping concept and mappings originate from Akshay Kadam's GPL-3.0 project. The runtime scaffolding here is a new implementation. Distribute adapted code under GPL-3.0 with upstream attribution.
