@@ -27,6 +27,10 @@ public final class PixelBoardModule extends XposedModule {
     }
 
     @Override public void onPackageReady(PackageReadyParam param) {
+        if ("com.google.android.aicore".equals(param.getPackageName())) {
+            prepareAicoreDiagnostics(param.getClassLoader());
+            return;
+        }
         if ("com.google.android.as.oss".equals(param.getPackageName())) {
             prepareAstrea(param.getClassLoader());
             return;
@@ -57,6 +61,84 @@ public final class PixelBoardModule extends XposedModule {
         }
     }
 
+
+
+    /** Observe only the inspected AICore version and the manifest client under investigation. */
+    private void prepareAicoreDiagnostics(ClassLoader loader) {
+        if (loader == null) return;
+        try {
+            Method attach = Application.class.getDeclaredMethod("attach", Context.class);
+            hook(attach).intercept(chain -> {
+                Object result = chain.proceed();
+                Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
+                if (arg instanceof Context && bootstrapped.compareAndSet(false, true)) {
+                    Context context = (Context) arg;
+                    if ("com.google.android.aicore".equals(context.getPackageName())) {
+                        try { installAicoreDiagnostics(loader, context); }
+                        catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                            Log.e(TAG, "AICore manifest diagnostics skipped", e);
+                        }
+                    }
+                }
+                return result;
+            });
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            Log.e(TAG, "AICore diagnostic attach hook skipped", e);
+        }
+    }
+
+    private void installAicoreDiagnostics(ClassLoader loader, Context context)
+            throws ReflectiveOperationException {
+        PackageInfo pkg;
+        try { pkg = context.getPackageManager().getPackageInfo("com.google.android.aicore", 0); }
+        catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "AICore version unavailable", e);
+            return;
+        }
+        if (pkg.getLongVersionCode() != 526928L
+                || !"0.release.qc8635.prod_aicore_20260917.00_RC01".equals(pkg.versionName)) {
+            Log.w(TAG, "AICore unsupported version; diagnostics skipped");
+            return;
+        }
+        Method clientName = new TargetMethod("isz", "a", "java.lang.String").resolve(loader);
+        Method fetch = new TargetMethod("ity", "a", "java.lang.Object",
+                "isz", "java.util.Map", "nrj").resolve(loader);
+        AtomicInteger hits = new AtomicInteger(0);
+        hook(fetch).intercept(chain -> {
+            // Diagnostic failures must never change or suppress the original request.
+            try {
+                if (chain.getArgs().size() == 3) {
+                    Object client = chain.getArgs().get(0);
+                    Object labels = chain.getArgs().get(1);
+                    if (client != null && labels instanceof java.util.Map
+                            && "com.google.android.aicore:18103149225492435673"
+                                    .equals(clientName.invoke(client))
+                            && hits.incrementAndGet() <= 6) {
+                        java.util.Map<?, ?> map = (java.util.Map<?, ?>) labels;
+                        StringBuilder line = new StringBuilder("AICore manifest labels:");
+                        for (String key : new String[] {
+                                "build_id", "device_tier", "variant", "client_group"}) {
+                            Object value = map.get(key);
+                            line.append(" ").append(key).append("=");
+                            if (!map.containsKey(key)) line.append("<absent>");
+                            else if (value == null) line.append("<null>");
+                            else if (value instanceof String) {
+                                String text = (String) value;
+                                if (text.isEmpty()) line.append("<empty>");
+                                else line.append(text.substring(0, Math.min(96, text.length()))
+                                        .replace('\\n', ' ').replace('\\r', ' '));
+                            } else line.append("<unexpected-type>");
+                        }
+                        Log.i(TAG, line.toString());
+                    }
+                }
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                Log.w(TAG, "AICore label observation failed; original request retained", e);
+            }
+            return chain.proceed();
+        });
+        Log.i(TAG, "AICore 526928 manifest diagnostics installed; no request overrides");
+    }
 
     /** Only the supplied PCS 116015 APK has been inspected. Unknown versions stay stock. */
     private void prepareAstrea(ClassLoader loader) {
