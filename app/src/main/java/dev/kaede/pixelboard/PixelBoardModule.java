@@ -126,7 +126,7 @@ public final class PixelBoardModule extends XposedModule {
                                 String text = (String) value;
                                 if (text.isEmpty()) line.append("<empty>");
                                 else line.append(text.substring(0, Math.min(96, text.length()))
-                                        .replace('\\n', ' ').replace('\\r', ' '));
+                                        .replace((char) 10, ' ').replace((char) 13, ' '));
                             } else line.append("<unexpected-type>");
                         }
                         Log.i(TAG, line.toString());
