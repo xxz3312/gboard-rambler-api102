@@ -27,7 +27,7 @@ public final class SettingsActivity extends Activity {
         addToggle(list,"rambler","Rambler (experimental)","May alter eligible Gboard feature flags; not verified.");
         addToggle(list,"spellchecker","Inline spellchecker (experimental)","Obfuscated method mapping needs on-device validation.");
         addToggle(list,"diagnostics","Diagnostic hooks","Observe selection and emit Android logcat messages.");
-        addToggle(list,"writing_tools","AI Writing Tools (not implemented)","Switch is saved; no Writing Tools hooks are installed.");
+        addToggle(list,"writing_tools","AI Writing Tools (experimental)","Runtime flags from PixelBoard; toolbar and backend may still require additional hooks. Restart Gboard after changing.");
         addText(list, "LSPosed framework service: " + (((ModuleApp)getApplication()).connected() ? "connected" : "not connected") + ". Configuration sync is retried upon connection.", false);
         addText(list, "Logcat filter: PixelBoardLS. Toggle state is not proof of successful Hook installation.", false);
         setContentView(root);
