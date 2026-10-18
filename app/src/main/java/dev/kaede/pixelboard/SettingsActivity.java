@@ -28,6 +28,7 @@ public final class SettingsActivity extends Activity {
         addToggle(list,"spellchecker","Inline spellchecker (experimental)","Obfuscated method mapping needs on-device validation.");
         addToggle(list,"diagnostics","Diagnostic hooks","Observe selection and emit Android logcat messages.");
         addToggle(list,"writing_tools","AI Writing Tools (not implemented)","Switch is saved; no Writing Tools hooks are installed.");
+        addText(list, "LSPosed framework service: " + (((ModuleApp)getApplication()).connected() ? "connected" : "not connected") + ". Configuration sync is retried upon connection.", false);
         addText(list, "Logcat filter: PixelBoardLS. Toggle state is not proof of successful Hook installation.", false);
         setContentView(root);
     }
@@ -36,7 +37,8 @@ public final class SettingsActivity extends Activity {
         toggle.setText(title);
         toggle.setChecked(prefs.getBoolean(key,false));
         toggle.setOnCheckedChangeListener((button, checked) ->
-            prefs.edit().putBoolean(key,checked).apply());
+            { prefs.edit().putBoolean(key,checked).apply();
+                ((ModuleApp)getApplication()).sync(); });
         parent.addView(toggle);
         addText(parent,note,false);
     }

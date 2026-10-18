@@ -48,7 +48,7 @@ public final class PixelBoardModule extends XposedModule {
     }
 
     private void initializeForGboard(ClassLoader loader, Context context) {
-        FeatureConfig.initialize(context);
+        FeatureConfig.initialize(this);
         Log.i(TAG, "Gboard Application Context available; SDK " + Build.VERSION.SDK_INT
               + "; Rambler=" + FeatureConfig.rambler()
               + "; diagnostics=" + FeatureConfig.diagnostics());
