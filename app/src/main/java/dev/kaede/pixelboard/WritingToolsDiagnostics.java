@@ -44,10 +44,8 @@ public final class WritingToolsDiagnostics {
                     Log.i(TAG, "WritingTools signal rejected non-static: " + spec[0] + "#" + spec[1]);
                     continue;
                 }
-                field.setAccessible(true);
-                Object signal = field.get(null);
-                Log.i(TAG, "WritingTools signal candidate: " + spec[0] + "#" + spec[1]
-                        + " present=" + (signal != null));
+                Log.i(TAG, "WritingTools signal descriptor found: " + spec[0] + "#" + spec[1]
+                        + " type=" + field.getType().getName());
             } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
                 Log.i(TAG, "WritingTools signal unavailable: " + spec[0] + "#" + spec[1]);
             }
