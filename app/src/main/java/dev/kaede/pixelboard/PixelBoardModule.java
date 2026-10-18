@@ -53,6 +53,7 @@ public final class PixelBoardModule extends XposedModule {
               + "; Rambler=" + FeatureConfig.rambler()
               + "; diagnostics=" + FeatureConfig.diagnostics());
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
+        if (FeatureConfig.writingTools()) WritingToolsDiagnostics.probe(loader);
         if (FeatureConfig.rambler() || FeatureConfig.diagnostics() || FeatureConfig.writingTools()) installRambler(loader);
         if (FeatureConfig.writingTools())
             Log.i(TAG, "Writing Tools flag policy enabled (runtime only; no DEX patch)");
