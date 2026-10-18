@@ -19,6 +19,7 @@ public final class PixelBoardModule extends XposedModule {
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
     private final AtomicInteger writingFlagLogCount = new AtomicInteger(0);
     private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
+    private final AtomicInteger toolbarConsumerLogCount = new AtomicInteger(0);
     private volatile Context hostContext;
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
@@ -66,7 +67,10 @@ public final class PixelBoardModule extends XposedModule {
               + "; Rambler=" + FeatureConfig.rambler()
               + "; diagnostics=" + FeatureConfig.diagnostics());
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
-        if (FeatureConfig.writingTools()) WritingToolsDiagnostics.probe(loader);
+        if (FeatureConfig.writingTools()) {
+            WritingToolsDiagnostics.probe(loader);
+            observeWritingToolsToolbarConsumer(loader);
+        }
         RamblerBindings.Profile voiceProfile = null;
         if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) {
             voiceProfile = RamblerBindings.select(loader);
@@ -173,6 +177,28 @@ public final class PixelBoardModule extends XposedModule {
                     + " / profile=" + binding.profile);
         } catch (RuntimeException | LinkageError e) {
             Log.w(TAG, "Flag getter hook skipped", e);
+        }
+    }
+
+    /**
+     * Gboard 18.4.1 APK: pmb#n(nsn):String reads plx#n, the V2 toolbar flag.
+     * This is an OBSERVER only: never logs user text, arguments or return data.
+     */
+    private void observeWritingToolsToolbarConsumer(ClassLoader loader) {
+        try {
+            Method method = new TargetMethod("pmb", "n", "java.lang.String", "nsn")
+                    .resolve(loader);
+            hook(method).intercept(chain -> {
+                Object result = chain.proceed();
+                int hit = toolbarConsumerLogCount.incrementAndGet();
+                if (hit <= 8)
+                    Log.i(TAG, "WritingTools 18.4.1 pmb#n toolbar flag consumer invoked #"
+                            + hit + ", returnedNull=" + (result == null));
+                return result;
+            });
+            Log.i(TAG, "WritingTools 18.4.1 pmb#n passive observer installed");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            Log.w(TAG, "WritingTools 18.4.1 pmb#n observer not installed", e);
         }
     }
 
