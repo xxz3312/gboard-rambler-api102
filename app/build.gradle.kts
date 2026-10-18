@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1-cloud-test"
+        versionCode = 3
+        versionName = "0.1.2-aicore-probe"
     }
     buildTypes {
         release {
@@ -18,4 +18,4 @@ android {
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
-dependencies { compileOnly("io.github.libxposed:api:102.0.0"); implementation("io.github.libxposed:service:102.0.0"); testImplementation("junit:junit:4.13.2") }
+dependencies { compileOnly("io.github.libxposed:api:102.0.0"); implementation("io.github.libxposed:service:102.0.0"); testImplementation("junit:junit:4.13.2"); implementation("com.google.mlkit:genai-rewriting:1.0.0-beta1"); implementation("com.google.mlkit:genai-proofreading:1.0.0-beta1") }

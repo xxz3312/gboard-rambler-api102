@@ -27,9 +27,14 @@ public final class SettingsActivity extends Activity {
         addToggle(list,"rambler","Rambler (experimental)","May alter eligible Gboard feature flags; not verified.");
         addToggle(list,"spellchecker","Inline spellchecker (experimental)","Obfuscated method mapping needs on-device validation.");
         addToggle(list,"diagnostics","Diagnostic hooks","Observe selection and emit Android logcat messages.");
-        addToggle(list,"writing_tools","AI 写作工具 · 基础云端测试版","使用 Google 云端校对/改写，关闭 V2 和本地推理。入口和实际改写尚待验证；修改后需强制停止并重新打开 Gboard。");
+        addToggle(list,"writing_tools","AI 写作工具 · 基础云端测试版","使用 Google 云端校对/改写，关闭 V2 和本地推理。基础云端写作已通过用户实测；修改后需强制停止并重新打开 Gboard。");
         addText(list, "LSPosed framework service: " + (((ModuleApp)getApplication()).connected() ? "connected" : "not connected") + ". Configuration sync is retried upon connection.", false);
         addText(list, "Logcat filter: PixelBoardLS. Toggle state is not proof of successful Hook installation.", false);
+        android.widget.Button aiCore = new android.widget.Button(this);
+        aiCore.setText("检测 AICore 本地写作能力");
+        aiCore.setOnClickListener(v -> startActivity(
+                new android.content.Intent(this, AiCoreProbeActivity.class)));
+        list.addView(aiCore);
         setContentView(root);
     }
     private void addToggle(LinearLayout parent, String key, String title, String note) {

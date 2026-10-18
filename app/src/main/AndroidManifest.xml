@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.google.android.aicore"/>
+    </queries>
     <application android:name=".ModuleApp" android:label="Gboard Rambler API102"
         android:description="@string/module_description" android:allowBackup="false">
+        <activity android:name=".AiCoreProbeActivity" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
