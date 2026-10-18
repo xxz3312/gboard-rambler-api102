@@ -53,9 +53,9 @@ public final class PixelBoardModule extends XposedModule {
               + "; Rambler=" + FeatureConfig.rambler()
               + "; diagnostics=" + FeatureConfig.diagnostics());
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
-        if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) installRambler(loader);
+        if (FeatureConfig.rambler() || FeatureConfig.diagnostics() || FeatureConfig.writingTools()) installRambler(loader);
         if (FeatureConfig.writingTools())
-            Log.w(TAG, "Writing Tools not implemented; skipping");
+            Log.i(TAG, "Writing Tools flag policy enabled (runtime only; no DEX patch)");
     }
 
     private void installRambler(ClassLoader loader) {
@@ -68,7 +68,7 @@ public final class PixelBoardModule extends XposedModule {
         hookScope(profile.defaults, loader, true);
         observeSelectionRead(profile.read, loader);
         observeSelectionWrite(profile.write, loader);
-        if (FeatureConfig.rambler()) installFlagGetter(loader, profile.id);
+        if (FeatureConfig.rambler() || FeatureConfig.writingTools()) installFlagGetter(loader, profile.id);
     }
 
     private void hookScope(TargetMethod target, ClassLoader loader, boolean defaults) {
@@ -126,11 +126,12 @@ public final class PixelBoardModule extends XposedModule {
                 if (receiver == null) return original;
                 try {
                     String flag = binding.name(receiver);
-                    if (!RamblerFlagPolicy.targeted(flag)) return original;
+                    if (!RamblerFlagPolicy.targeted(flag) && !WritingToolsFlagPolicy.targeted(flag)) return original;
                     Context context = GboardContext.current();
                     if (context == null) return original;
                     // Only if explicitly enabled AND a known profile and host context match.
-                    return RamblerFlagPolicy.transform(flag, original, context);
+                    Object writingResult = WritingToolsFlagPolicy.transform(flag, original, context);
+                    return RamblerFlagPolicy.transform(flag, writingResult, context);
                 } catch (ReflectiveOperationException | RuntimeException e) {
                     Log.w(TAG, "Flag transform failed; stock value returned", e);
                     return original;
