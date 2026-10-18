@@ -1,22 +1,26 @@
-# Rambler runtime migration notes
+# Rambler runtime migration status
 
-Upstream (GPL-3.0): `extensions/extension/.../rambler/GboardRambler1803OfficialSelectionRuntime.java`
-and `GboardRambler1803StockPolicy.java`, author Akshay Kadam.
+Based on GPL-3.0 PixelBoard upstream sources:
+- `GboardRambler1803OfficialSelectionRuntime.java`
+- `GboardRambler1803StockPolicy.java`
+- `GboardRambler1803OfficialSelectorPatch.kt`
+- `GboardFlagFamilyComposer.kt`
 
-## Ported as independent policy classes
+## Implemented source (unbuilt)
 
-- `RamblerSelection`: maintain last verified official selection, check `enable_jetson` preference, preserve voice/default-selection scope precedence; never write preferences.
-- `RamblerFlagPolicy`: explicit allowlist of 18 feature identifiers, plus dict settings and activation type with strict boxed-type checking.
-- Gating on `FeatureConfig.ENABLE_RAMBLER`, which remains **false**.
-- The policy is **not attached** to a Gboard flag reader. No functionality is enabled by this commit.
+- Complete-descriptor Rambler selector mapping for three published version families.
+- Reentrant voice-settings and default-selection scope wrappers.
+- Selection read hook observes a returned Boolean, using the same host Context argument; selection write hook currently pass-through.
+- Typed flag getter candidate mapping: `odx.g()/a` (18.4.1), `obw.g()/a` (18.3.1 release), `acps.g()/a` (18.3.1), `nxw.g()/a` (18.0.3).
+- Getter hook is **pass-through only**, until Gboard Context acquisition and owner/flag semantics are verified on-device.
+- All behavior-changing feature toggles disabled, builds manual only.
 
-## Missing integration
+## Pending
 
-1. Recover Gboard typed flag-reader signature and name/argument extraction from upstream flag-family implementation.
-2. Validate the exact reader against a real official Gboard APK for each version.
-3. Connect `RamblerSelection.observe` to the version-verified formal selector read/write hooks. Lifecycle wrappers currently observe only.
-4. Wire policy to a narrowly targeted flag-read hook only after strict verification.
-5. Unit-test scope precedence, disabled state, and boxed value type preservation.
-6. Verify on-device behavior, without assuming server eligibility.
+1. Verify flag getter owner/field with actual target APK and distinguish all patch variants.
+2. Wire explicit Gboard app Context acquisition rather than relying on null or global mutable context.
+3. Verify official selector write argument semantics; do not assume its Boolean is the selected mode.
+4. Wire `RamblerFlagPolicy.transform` only when Context and flag receiver are verified.
+5. Unit-test selection / scope cases and ART hook installation, then consider enabling flags.
 
-Do not globally intercept SharedPreferences or force `enable_jetson` to true; such changes are liable to leak beyond Gboard's official selector.
+No claim of functional Rambler activation yet.
