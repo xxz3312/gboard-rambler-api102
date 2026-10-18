@@ -1,7 +1,7 @@
 plugins { id("com.android.application") }
 android {
     namespace = "dev.kaede.pixelboard"
-    compileSdk = 35
+    compileSdk = 37
     defaultConfig {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
