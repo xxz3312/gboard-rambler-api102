@@ -8,7 +8,7 @@ import java.util.Set;
 public final class RuntimeStatusFormat {
     private RuntimeStatusFormat() {}
     private static final Set<String> EVENTS = new HashSet<>(Arrays.asList(
-            "CHANNEL_TEST", "GBOARD_ATTACHED", "INIT_FAILED", "FLAGS_READY", "FLAGS_FAILED",
+            "RUNTIME_ALIVE", "CHANNEL_TEST", "GBOARD_ATTACHED", "INIT_FAILED", "FLAGS_READY", "FLAGS_FAILED",
             "MODE", "STATE", "BACKEND_PACKAGE", "ASTREA_FLAG", "MANIFEST_REQUEST",
             "V2_PROFILE_FAILED", "V2_DIAGNOSTICS_READY", "V2_DIAGNOSTICS_FAILED",
             "V2_ROUTE", "V2_SESSION_REQUEST", "V2_SESSION_READY", "V2_SESSION_FAILED",
@@ -23,6 +23,10 @@ public final class RuntimeStatusFormat {
             out.append(c >= 32 && c <= 126 ? c : ' ');
         }
         return out.toString();
+    }
+    public static String historyKey(String version) { return "history_v_" + metadata(version); }
+    public static boolean matchesProbe(String expected, String actual) {
+        return expected != null && !expected.isEmpty() && expected.equals(actual);
     }
     public static String append(String previous, String line) {
         String combined = (previous == null || previous.isEmpty()) ? line : previous + "\n" + line;

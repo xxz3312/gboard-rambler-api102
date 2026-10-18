@@ -31,8 +31,14 @@ public final class RuntimeStatusReceiver extends BroadcastReceiver {
             String line = time + " " + sender + " uid=" + uid + " pid=" + pid
                     + " module=" + version + " " + event + " " + detail;
             SharedPreferences prefs = context.getSharedPreferences(RuntimeStatus.PREFS, Context.MODE_PRIVATE);
-            prefs.edit().putString("history", RuntimeStatusFormat.append(prefs.getString("history", ""), line))
-                    .putString("last_" + sender + "_" + event, line).apply();
+            if ("RUNTIME_ALIVE".equals(event)) {
+                if (!RuntimeStatus.GBOARD.equals(sender) || !RuntimeStatusFormat.matchesProbe(
+                        prefs.getString("probe_nonce", ""), intent.getStringExtra("request_id"))) return;
+                prefs.edit().putString("probe_reply", line).apply();
+            }
+            String key = RuntimeStatusFormat.historyKey(version);
+            prefs.edit().putString(key, RuntimeStatusFormat.append(prefs.getString(key, ""), line))
+                    .putString("last_v_" + version + "_" + sender + "_" + event, line).apply();
         } catch (android.content.pm.PackageManager.NameNotFoundException | RuntimeException ignored) { }
     }
 }

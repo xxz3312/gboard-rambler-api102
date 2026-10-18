@@ -197,3 +197,15 @@ optional local proofreading off. Restart the affected processes, attempt one
 Writing Tools operation, then copy the module's runtime report. Private status
 failure still requires interpreting the actual enum and backend response;
 0.1.11 does not claim to fix a missing Feature 703 or server manifest rejection.
+
+## 0.1.12 live diagnostics
+
+Runtime reports now isolate history by the injected module version. A live query sends
+a random challenge to the running Gboard receiver; only an OS-authenticated Gboard
+reply matching that challenge is accepted. The reply reports its actual module version
+and PID, plus read-only handler metadata. An absent reply does not prove injection failed.
+
+The optional Root reload button runs only on a user tap and stops the three fixed target
+packages. Its exit status is displayed; it does not claim that a new module is loaded.
+Use the settings test editor to start Gboard, then request a live reply. No input text is
+included in diagnostic broadcasts. Model readiness, consent and backend policy are unchanged.

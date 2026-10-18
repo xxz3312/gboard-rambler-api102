@@ -23,4 +23,13 @@ public final class RuntimeStatusFormatTest {
         assertEquals("event=60", lines[0]);
         assertEquals("event=99", lines[39]);
     }
+    @org.junit.Test public void liveChallengeRejectsMissingAndStaleReplies() {
+        org.junit.Assert.assertFalse(RuntimeStatusFormat.matchesProbe("", ""));
+        org.junit.Assert.assertFalse(RuntimeStatusFormat.matchesProbe("new", "old"));
+        org.junit.Assert.assertTrue(RuntimeStatusFormat.matchesProbe("new", "new"));
+    }
+    @org.junit.Test public void differentModuleVersionsHaveSeparateHistory() {
+        org.junit.Assert.assertNotEquals(RuntimeStatusFormat.historyKey("0.1.11"),
+                RuntimeStatusFormat.historyKey("0.1.12"));
+    }
 }

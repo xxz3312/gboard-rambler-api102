@@ -91,6 +91,42 @@ public final class SettingsActivity extends Activity {
         channelTest.setText("诊断通道自检");
         channelTest.setOnClickListener(v -> RuntimeStatus.send(this, "CHANNEL_TEST", "transport_only=true"));
         list.addView(channelTest);
+        android.widget.Button live = new android.widget.Button(this);
+        live.setText("查询当前 Gboard（实时应答）");
+        live.setOnClickListener(v -> {
+            try { RuntimeProbe.request(this); }
+            catch (RuntimeException e) {
+                runtimePrefs.edit().putString("probe_reply",
+                        "实时查询发送失败：" + e.getClass().getSimpleName()).apply();
+            }
+            refreshRuntimeStatus();
+        });
+        list.addView(live);
+        addText(list, "可选 Root 重载会停止 Gboard、AICore 和 Private Compute Services。"
+                + "仅点击按钮时请求 Root；随后点击下方输入框唤起键盘，再查询实时应答。", false);
+        android.widget.Button reload = new android.widget.Button(this);
+        reload.setText("重载目标进程（Root）");
+        reload.setOnClickListener(v -> {
+            reload.setEnabled(false);
+            runtimePrefs.edit().putString("reload_result", "正在请求 Root 并停止目标进程…").apply();
+            android.content.Context app = getApplicationContext();
+            new Thread(() -> {
+                String result = RuntimeReload.run();
+                app.getSharedPreferences(RuntimeStatus.PREFS, MODE_PRIVATE).edit()
+                        .putString("reload_result", result).apply();
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) reload.setEnabled(true);
+                });
+            }, "PixelBoard-reload").start();
+        });
+        list.addView(reload);
+        addText(list, "测试输入框：可在此唤起 Gboard，再尝试写作工具。", false);
+        android.widget.EditText editor = new android.widget.EditText(this);
+        editor.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                | android.text.InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
+        editor.setText("I has a meeting tomorrow.");
+        list.addView(editor);
         setContentView(root);
     }
 
@@ -107,27 +143,24 @@ public final class SettingsActivity extends Activity {
 
     private void refreshRuntimeStatus() {
         if (runtimeReport == null || runtimePrefs == null) return;
-        String history = runtimePrefs.getString("history", "");
-        String attached = runtimePrefs.getString(
-                "last_com.google.android.inputmethod.latin_GBOARD_ATTACHED", "");
-        String activity = "";
-        for (java.util.Map.Entry<String, ?> entry : runtimePrefs.getAll().entrySet())
-            if (entry.getKey().startsWith("last_com.google.android.inputmethod.latin_")
-                    && entry.getValue() instanceof String
-                    && ((String) entry.getValue()).compareTo(activity) > 0)
-                activity = (String) entry.getValue();
-        String initialization = !attached.isEmpty() ? attached
-                : !activity.isEmpty() ? "已收到 Gboard 运行事件；启动事件未保存。\n" + activity
-                : "尚未收到 Gboard 事件。可能尚未重启进程或状态通道未送达。";
-        runtimeReport.setText("模块版本：" + BuildConfig.VERSION_NAME
+        String version = BuildConfig.VERSION_NAME;
+        String history = runtimePrefs.getString(RuntimeStatusFormat.historyKey(version), "");
+        String attached = runtimePrefs.getString("last_v_" + version + "_"
+                + RuntimeStatus.GBOARD + "_GBOARD_ATTACHED", "");
+        String reply = runtimePrefs.getString("probe_reply", "");
+        boolean requested = runtimePrefs.getLong("probe_time", 0) > 0;
+        runtimeReport.setText("模块版本：" + version
                 + "\n保存配置：V2=" + (prefs.getBoolean("writing_tools", false)
                         && prefs.getBoolean("writing_tools_v2", false))
                 + " 后端=" + prefs.getInt("writing_tools_backend", 2)
                 + " 端侧校对请求=" + prefs.getBoolean("v2_local_proofread", false)
-                + "\n最近一次 Gboard 初始化事件：\n"
-                + initialization
-                + "\n最近 40 条事件：\n"
-                + (history.isEmpty() ? "暂无事件。可先点击诊断通道自检。" : history));
+                + "\n本次实时查询：\n" + (!reply.isEmpty() ? reply
+                        : requested ? "尚未收到本次应答；不能据此判定未注入。"
+                        : "尚未查询。请唤起 Gboard 后点击实时查询。")
+                + "\n当前版本启动事件：\n" + (attached.isEmpty() ? "尚未收到。" : attached)
+                + "\nRoot 重载结果：\n" + runtimePrefs.getString("reload_result", "尚未执行。")
+                + "\n当前模块版本最近 40 条事件：\n"
+                + (history.isEmpty() ? "暂无。旧版历史不作为当前状态显示。" : history));
     }
 
     private void addToggle(LinearLayout parent, String key, String title, String note) {

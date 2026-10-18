@@ -353,6 +353,7 @@ public final class PixelBoardModule extends XposedModule {
 
     private void initializeForGboard(ClassLoader loader, Context context) {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        RuntimeProbe.install(hostContext, loader);
         FeatureConfig.initialize(this);
         recordStatus(context, "GBOARD_ATTACHED", "writingTools=" + FeatureConfig.writingTools()
                 + " v2Requested=" + FeatureConfig.writingToolsV2()
