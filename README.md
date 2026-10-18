@@ -1,11 +1,12 @@
 # Gboard Rambler — LSPosed API 102
 
-Experimental runtime port based on [PixelBoard](https://github.com/Akshayykadam/PixelBoard) (GPL-3.0, Akshay Kadam).
+Experimental Modern LSPosed port of selected [PixelBoard](https://github.com/Akshayykadam/PixelBoard) features (GPL-3.0).
 
-Source currently provides version-conditional Rambler method mappings, lifecycle hooks, read-only selection tracking and guarded typed flag transforms. **All experiment toggles are off by default.** Nothing has been compiled or validated on an Android device; Rambler and Writing Tools must not be presented as working features.
+**Current state: uncompiled, no APK, not verified working.** Rambler feature flag hook scaffolding is present but disabled; feature activation is unconfirmed. Writing Tools has a read-only typed flag inventory and 18.0.3 candidate method bindings only; **no Writing Tools hooks are installed**. All experimental toggles remain false.
 
-Important fixes: require a genuine Gboard Context before overriding flags, respect `enable_jetson=false` for *every* override, and make reflected target methods accessible. The code targets Modern libxposed API 102 and the GitHub Actions workflow runs manually only.
+- [Rambler port notes](docs/RAMBLER_PORT.md)
+- [Writing Tools port notes](docs/WRITING_TOOLS_PORT.md)
+- [Validation checklist](docs/VALIDATION.md)
+- [Porting overview](docs/PORTING.md)
 
-Development notes: [Rambler migration](docs/RAMBLER_PORT.md), [validation](docs/VALIDATION.md), [patch plan](docs/PORTING.md).
-
-Copyright of upstream-derived design and flag definitions remains with their contributors. GPL-3.0.
+GitHub Actions runs only manually via `workflow_dispatch`; commits do not trigger builds. Attribution: Akshay Kadam and PixelBoard contributors. GPL-3.0.
