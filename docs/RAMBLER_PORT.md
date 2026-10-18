@@ -1,26 +1,22 @@
-# Rambler runtime migration status
+# Rambler port (uncompiled, disabled)
 
-Based on GPL-3.0 PixelBoard upstream sources:
-- `GboardRambler1803OfficialSelectionRuntime.java`
-- `GboardRambler1803StockPolicy.java`
-- `GboardRambler1803OfficialSelectorPatch.kt`
-- `GboardFlagFamilyComposer.kt`
+GPL-3.0 source: Akshayykadam/PixelBoard, especially GboardFlagFamilyComposer and OfficialSelectionRuntime.
 
-## Implemented source (unbuilt)
+## Added
 
-- Complete-descriptor Rambler selector mapping for three published version families.
-- Reentrant voice-settings and default-selection scope wrappers.
-- Selection read hook observes a returned Boolean, using the same host Context argument; selection write hook currently pass-through.
-- Typed flag getter candidate mapping: `odx.g()/a` (18.4.1), `obw.g()/a` (18.3.1 release), `acps.g()/a` (18.3.1), `nxw.g()/a` (18.0.3).
-- Getter hook is **pass-through only**, until Gboard Context acquisition and owner/flag semantics are verified on-device.
-- All behavior-changing feature toggles disabled, builds manual only.
+- Version-conditional selector lifecycle scopes with finalizer cleanup.
+- Typed allowlisted flag policy and read-only `enable_jetson` preference.
+- Gboard-only `ActivityThread.currentApplication()` Context lookup, no app Context caching.
+- Getter receiver/field/getter signature validation for `odx` (18.4.1) and `obw` / `acps` (18.3.1).
+- **18.0.3 flag name field intentionally not guessed**.
+- Guarded `RamblerFlagPolicy.transform` attached in source but feature toggle is **false**.
 
-## Pending
+## Outstanding
 
-1. Verify flag getter owner/field with actual target APK and distinguish all patch variants.
-2. Wire explicit Gboard app Context acquisition rather than relying on null or global mutable context.
-3. Verify official selector write argument semantics; do not assume its Boolean is the selected mode.
-4. Wire `RamblerFlagPolicy.transform` only when Context and flag receiver are verified.
-5. Unit-test selection / scope cases and ART hook installation, then consider enabling flags.
+- Real APK DEX signature verification, including Gboard variants with overlapping candidate classes.
+- Verify LSPosed API 102 Java hook syntax and Android hidden API behavior before building.
+- Confirm official selector read/write semantics and integrate selection write only when justified.
+- Add automated tests and validate against stock Gboard.
+- Rambler actual activation / server eligibility remains unproven.
 
-No claim of functional Rambler activation yet.
+GitHub workflow has manual-only trigger; this code push does not request a build.

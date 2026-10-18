@@ -7,7 +7,7 @@ import java.lang.reflect.Method;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam;
 
-/** Gboard-only modern API 102 entry. Never mutates the installed APK. */
+/** Gboard-only modern LSPosed entry; fail-closed reflection and disabled feature switches. */
 public final class PixelBoardModule extends XposedModule {
     private static final String TAG = "PixelBoardLS";
     private static final String GBOARD = "com.google.android.inputmethod.latin";
@@ -18,17 +18,16 @@ public final class PixelBoardModule extends XposedModule {
         if (loader == null) { Log.w(TAG, "No Gboard classloader"); return; }
         Log.i(TAG, "Attached to Gboard on SDK " + Build.VERSION.SDK_INT);
         if (FeatureConfig.ENABLE_INLINE_SPELLCHECKER) installSpellChecker(loader);
-        if (FeatureConfig.ENABLE_RAMBLER || FeatureConfig.ENABLE_DIAGNOSTIC_HOOKS) {
+        if (FeatureConfig.ENABLE_RAMBLER || FeatureConfig.ENABLE_DIAGNOSTIC_HOOKS)
             installRambler(loader);
-        }
         if (FeatureConfig.ENABLE_WRITING_TOOLS)
             Log.w(TAG, "Writing Tools not implemented; skipping");
     }
 
     private void installRambler(ClassLoader loader) {
         RamblerBindings.Profile profile = RamblerBindings.select(loader);
-        if (profile == null) { Log.w(TAG, "No unambiguous Rambler profile; skipped"); return; }
-        Log.i(TAG, "Resolved selector profile " + profile.id);
+        if (profile == null) { Log.w(TAG, "No unique verified selector signatures; skipped"); return; }
+        Log.i(TAG, "Resolved selector signature family: " + profile.id);
         hookScope(profile.layout, loader, false);
         hookScope(profile.setup, loader, false);
         hookScope(profile.create, loader, false);
@@ -49,7 +48,7 @@ public final class PixelBoardModule extends XposedModule {
                 }
             });
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
-            Log.w(TAG, "Lifecycle hook skipped: " + target, e);
+            Log.w(TAG, "Scope hook skipped: " + target, e);
         }
     }
 
@@ -58,10 +57,8 @@ public final class PixelBoardModule extends XposedModule {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
                 if (result instanceof Boolean) {
-                    Context context = chain.getArgs().isEmpty() ? null
-                            : chain.getArgs().get(0) instanceof Context
-                            ? (Context)chain.getArgs().get(0) : null;
-                    RamblerSelection.observe((Boolean)result, context);
+                    // Use host-owned Context rather than trusting a foreign caller.
+                    RamblerSelection.observe((Boolean) result, GboardContext.current());
                 }
                 return result;
             });
@@ -74,10 +71,8 @@ public final class PixelBoardModule extends XposedModule {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
-                // Writer is a void member; its first argument is not necessarily the
-                // selected mode. Never guess from that boolean alone.
                 if (FeatureConfig.ENABLE_DIAGNOSTIC_HOOKS)
-                    Log.d(TAG, "Official selector write completed");
+                    Log.d(TAG, "Official selector write completed (no forced selection)");
                 return result;
             });
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
@@ -85,10 +80,10 @@ public final class PixelBoardModule extends XposedModule {
         }
     }
 
-    private void installFlagGetter(ClassLoader loader, String profileId) {
-        RamblerFlagBindings.Binding binding = RamblerFlagBindings.resolve(loader, profileId);
+    private void installFlagGetter(ClassLoader loader, String profile) {
+        RamblerFlagBindings.Binding binding = RamblerFlagBindings.resolve(loader, profile);
         if (binding == null) {
-            Log.w(TAG, "No unique flag getter binding; feature flags untouched"); return;
+            Log.w(TAG, "No unique flag getter binding; leaving values intact"); return;
         }
         try {
             hook(binding.getter).intercept(chain -> {
@@ -98,21 +93,18 @@ public final class PixelBoardModule extends XposedModule {
                 try {
                     String flag = binding.name(receiver);
                     if (!RamblerFlagPolicy.targeted(flag)) return original;
-                    // Context acquisition is not yet validated. With a null context,
-                    // the policy remains conservative regarding explicit prefs only
-                    // when the app's selection observer supplied a verified state.
-                    // Do not modify values until a verified app Context is available.
-                    Context context = null;
+                    Context context = GboardContext.current();
                     if (context == null) return original;
+                    // Only if explicitly enabled AND a known profile and host context match.
                     return RamblerFlagPolicy.transform(flag, original, context);
                 } catch (ReflectiveOperationException | RuntimeException e) {
-                    Log.w(TAG, "Flag evaluation failed; preserving original", e);
+                    Log.w(TAG, "Flag transform failed; stock value returned", e);
                     return original;
                 }
             });
-            Log.i(TAG, "Flag getter intercepted in passthrough mode: " + binding.owner);
-        } catch (RuntimeException | LinkageError ex) {
-            Log.w(TAG, "Flag getter hook failed; stock values retained", ex);
+            Log.i(TAG, "Installed guarded Rambler flag policy: " + binding.owner);
+        } catch (RuntimeException | LinkageError e) {
+            Log.w(TAG, "Flag getter hook skipped", e);
         }
     }
 

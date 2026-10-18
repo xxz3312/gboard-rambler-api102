@@ -2,21 +2,18 @@ package dev.kaede.pixelboard;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
-/**
- * Stock obfuscated getter and name field from upstream GboardFlagFamilyComposer.
- * A mapping matches only if the exact method and String name field both exist.
- */
+/** Conservative mapping derived from PixelBoard's GboardFlagFamilyComposer (GPL-3.0). */
 public final class RamblerFlagBindings {
     private RamblerFlagBindings() {}
     public static final class Binding {
-        public final String profile, owner, methodName, fieldName;
+        public final String profile, owner;
         public final Method getter;
-        public final Field nameField;
-        private Binding(String profile, String owner, String methodName, String fieldName,
-                        Method getter, Field nameField) {
-            this.profile = profile; this.owner = owner; this.methodName = methodName;
-            this.fieldName = fieldName; this.getter = getter; this.nameField = nameField;
+        private final Field nameField;
+        private Binding(String profile, String owner, Method getter, Field field) {
+            this.profile = profile; this.owner = owner;
+            this.getter = getter; this.nameField = field;
         }
         public String name(Object receiver) throws IllegalAccessException {
             Object value = nameField.get(receiver);
@@ -25,28 +22,27 @@ public final class RamblerFlagBindings {
     }
     private static final String[][] CANDIDATES = {
         {"18.4.1", "odx", "g", "a"},
-        {"18.3.1-release", "obw", "g", "a"},
-        {"18.3.1", "acps", "g", "a"},
-        {"18.0.3", "nxw", "g", "a"}
+        {"18.3.1", "obw", "g", "a"},
+        {"18.3.1", "acps", "g", "a"}
+        // 18.0.3 nxw name-field binding remains unverified: don't assume nxw.a.
     };
-    public static Binding resolve(ClassLoader loader, String selectedProfile) {
+    public static Binding resolve(ClassLoader loader, String profile) {
         Binding found = null;
-        for (String[] candidate : CANDIDATES) {
-            if (!candidate[0].startsWith(selectedProfile)) continue;
+        for (String[] c : CANDIDATES) {
+            if (!profile.equals(c[0])) continue;
             try {
-                Class<?> owner = Class.forName(candidate[1], false, loader);
-                Method getter = owner.getDeclaredMethod(candidate[2]);
-                if (getter.getReturnType() != Object.class) continue;
-                Field field = owner.getDeclaredField(candidate[3]);
-                if (field.getType() != String.class) continue;
+                Class<?> owner = Class.forName(c[1], false, loader);
+                Method getter = owner.getDeclaredMethod(c[2]);
+                Field name = owner.getDeclaredField(c[3]);
+                if (Modifier.isStatic(getter.getModifiers()) ||
+                    Modifier.isStatic(name.getModifiers()) ||
+                    getter.getReturnType() != Object.class ||
+                    name.getType() != String.class) continue;
                 getter.setAccessible(true);
-                field.setAccessible(true);
-                if (found != null) return null; // ambiguity: fail closed
-                found = new Binding(candidate[0], candidate[1], candidate[2],
-                        candidate[3], getter, field);
-            } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
-                // Missing or drifted symbol; do not guess a replacement.
-            }
+                name.setAccessible(true);
+                if (found != null) return null;
+                found = new Binding(c[0], c[1], getter, name);
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {}
         }
         return found;
     }
