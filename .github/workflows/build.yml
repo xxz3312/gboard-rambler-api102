@@ -1,5 +1,7 @@
 name: Android CI (manual only)
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 jobs:
   debug:
@@ -16,7 +18,7 @@ jobs:
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -1)"
           if [ -n "$SDKMANAGER" ]; then
             yes | "$SDKMANAGER" --licenses >/dev/null || true
-            "$SDKMANAGER" "platforms;android-37" "build-tools;36.0.0"
+            "$SDKMANAGER" "platforms;android-37.0" "build-tools;36.0.0"
           else
             echo "sdkmanager missing"; exit 1
           fi
