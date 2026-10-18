@@ -1,11 +1,11 @@
-# PixelBoard LSPosed — API 102
+# Gboard Rambler — LSPosed API 102
 
-Experimental Modern LSPosed port for official Gboard, adapted from [PixelBoard](https://github.com/Akshayykadam/PixelBoard) (GPL-3.0).
+Experimental runtime port based on [PixelBoard](https://github.com/Akshayykadam/PixelBoard) (GPL-3.0, Akshay Kadam).
 
-Source includes version-scoped Rambler lifecycle interception, selection read observation, typed stock flag policy and fail-closed getter mappings. **The getter hook currently passes through unmodified values**; Rambler activation and AI Writing Tools are not implemented. Hooks are disabled by default.
+Source currently provides version-conditional Rambler method mappings, lifecycle hooks, read-only selection tracking and guarded typed flag transforms. **All experiment toggles are off by default.** Nothing has been compiled or validated on an Android device; Rambler and Writing Tools must not be presented as working features.
 
-See [Rambler porting notes](docs/RAMBLER_PORT.md) and [overview](docs/PORTING.md).
+Important fixes: require a genuine Gboard Context before overriding flags, respect `enable_jetson=false` for *every* override, and make reflected target methods accessible. The code targets Modern libxposed API 102 and the GitHub Actions workflow runs manually only.
 
-No automated builds on push: GitHub Actions can only be run manually via `workflow_dispatch`. This source has not been compiled or tested.
+Development notes: [Rambler migration](docs/RAMBLER_PORT.md), [validation](docs/VALIDATION.md), [patch plan](docs/PORTING.md).
 
-Licensed GPL-3.0 with attribution to Akshay Kadam's PixelBoard.
+Copyright of upstream-derived design and flag definitions remains with their contributors. GPL-3.0.

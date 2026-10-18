@@ -6,10 +6,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Typed allowlist based on PixelBoard GboardRambler1803StockPolicy (GPL-3.0).
- * Apply only at a VERSION-VERIFIED flag reader hook (not implemented yet).
- */
+/** Explicit feature allowlist adapted from PixelBoard StockPolicy (GPL-3.0). */
 public final class RamblerFlagPolicy {
     private RamblerFlagPolicy() {}
     private static final Set<String> BOOLEAN_FLAGS = Collections.unmodifiableSet(
@@ -34,22 +31,19 @@ public final class RamblerFlagPolicy {
             "agentic_dictation_enable_proactive_parallel_asr"
         ))
     );
-
     public static boolean targeted(String name) {
         return BOOLEAN_FLAGS.contains(name)
                 || "show_rambler_dict_settings".equals(name)
                 || "ad_activation_type".equals(name);
     }
-
     public static Object transform(String name, Object original, Context context) {
-        if (!FeatureConfig.ENABLE_RAMBLER || name == null) return original;
-        if ("show_rambler_dict_settings".equals(name)) {
-            return original instanceof Boolean ? Boolean.TRUE : original;
-        }
+        if (!FeatureConfig.ENABLE_RAMBLER || name == null || context == null) return original;
+        // Respect explicit opt-out across all flags, including activation type and settings.
         if (!RamblerSelection.mayExpose(context)) return original;
-        if ("ad_activation_type".equals(name)) {
+        if ("show_rambler_dict_settings".equals(name))
+            return original instanceof Boolean ? Boolean.TRUE : original;
+        if ("ad_activation_type".equals(name))
             return original instanceof Long ? Long.valueOf(2L) : original;
-        }
         return BOOLEAN_FLAGS.contains(name) && original instanceof Boolean
                 ? Boolean.TRUE : original;
     }

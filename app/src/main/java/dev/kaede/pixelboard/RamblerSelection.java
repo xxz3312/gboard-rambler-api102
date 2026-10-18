@@ -6,27 +6,26 @@ import android.os.Build;
 import android.preference.PreferenceManager;
 
 /**
- * Runtime eligibility decision extracted from PixelBoard's OfficialSelectionRuntime.
- * GPL-3.0 upstream: Akshayykadam/PixelBoard; adapted for runtime hooks.
- * No preference is written or silently created.
+ * Selection policy adapted from Akshayykadam/PixelBoard (GPL-3.0).
+ * Reads stock preferences; does not create or modify them.
  */
 public final class RamblerSelection {
     private static volatile Boolean observedSelection;
     private RamblerSelection() {}
 
     public static void observe(boolean selected, Context context) {
+        // Do not cache a transient false result as an explicit user opt-out.
         if (!selected && !explicitlyDisabled(context)) return;
         observedSelection = selected;
     }
 
-    /** Never re-enable a feature the user explicitly disabled. */
     public static boolean mayExpose(Context context) {
         if (RamblerScope.isDefaultSelection()) return false;
-        Boolean saved = readPreference(context);
-        if (Boolean.FALSE.equals(saved)) return false;
+        if (context == null) return false; // never widen policy without host context
+        Boolean pref = readPreference(context);
+        if (Boolean.FALSE.equals(pref)) return false;
         if (RamblerScope.isVoiceSettings()) return true;
-        Boolean observed = observedSelection;
-        return !Boolean.FALSE.equals(observed);
+        return !Boolean.FALSE.equals(observedSelection);
     }
 
     public static boolean explicitlyDisabled(Context context) {

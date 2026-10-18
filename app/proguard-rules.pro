@@ -1,4 +1,7 @@
 -dontwarn io.github.libxposed.annotation.**
--keep public class dev.kaede.pixelboard.PixelBoardModule { public <init>(); }
--keep class dev.kaede.pixelboard.** { *; }
 -adaptresourcefilecontents META-INF/xposed/java_init.list
+-keep,allowoptimization,allowobfuscation public class * extends io.github.libxposed.api.XposedModule {
+    public <init>();
+}
+-keep class dev.kaede.pixelboard.RamblerBindings { *; }
+-keep class dev.kaede.pixelboard.RamblerFlagBindings { *; }
