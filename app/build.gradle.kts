@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.1.14-astrea-auto"
+        versionCode = 16
+        versionName = "0.1.15-proof-status"
     }
     buildFeatures { buildConfig = true }
     buildTypes {

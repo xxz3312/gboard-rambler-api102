@@ -108,7 +108,9 @@ public final class SettingsActivity extends Activity {
         reload.setText("重载目标进程（Root）");
         reload.setOnClickListener(v -> {
             reload.setEnabled(false);
-            runtimePrefs.edit().putString("reload_result", "正在请求 Root 并停止目标进程…").apply();
+            runtimePrefs.edit().putString("reload_result", "正在请求 Root 并停止目标进程…")
+                    .remove("probe_client_version").remove("probe_nonce")
+                    .remove("probe_reply").remove("probe_time").apply();
             android.content.Context app = getApplicationContext();
             new Thread(() -> {
                 String result = RuntimeReload.run();
@@ -147,8 +149,9 @@ public final class SettingsActivity extends Activity {
         String history = runtimePrefs.getString(RuntimeStatusFormat.historyKey(version), "");
         String attached = runtimePrefs.getString("last_v_" + version + "_"
                 + RuntimeStatus.GBOARD + "_GBOARD_ATTACHED", "");
-        String reply = runtimePrefs.getString("probe_reply", "");
-        boolean requested = runtimePrefs.getLong("probe_time", 0) > 0;
+        boolean requested = version.equals(runtimePrefs.getString("probe_client_version", ""))
+                && runtimePrefs.getLong("probe_time", 0) > 0;
+        String reply = requested ? runtimePrefs.getString("probe_reply", "") : "";
         runtimeReport.setText("模块版本：" + version
                 + "\n保存配置：V2=" + (prefs.getBoolean("writing_tools", false)
                         && prefs.getBoolean("writing_tools_v2", false))

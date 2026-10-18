@@ -251,3 +251,24 @@ base APK signer SHA-256:
 No clock, keys, expiry, remote attestation, authentication or endpoints are overridden.
 A newer PCS package still needs on-device RPC/inference validation.
 Other Gboard and AICore hooks retain their existing explicit profiles.
+
+## 0.1.15 proof material diagnostics
+
+The supplied 149829 APK contains AndroidKeystoreAttesterImpl, which generates
+AndroidKeyStore EC-224 keys with the service challenge and retrieves the certificate
+chain. On generation failure it can return PLACEHOLDER_ATTESTATION_FOR_LOCAL_DEBUG.
+A missing log line does not establish whether that branch ran.
+
+Observe the stable JNI bridge's non-native onAttestationData(byte[][], byte[])
+wrapper before its original implementation, at most four times per process.
+Report entry/X.509 counts, exact-placeholder detection, and minimal Android
+attestation extension metadata when present (security level and hardware root of
+trust deviceLocked/verifiedBootState). Scan from root toward leaf for the first
+extension. These are unvalidated, parse-only observations, not a server eligibility
+verdict. No certificate bytes, challenges, device identifiers, token data, or user
+text are recorded. Preserve arguments, callbacks, keys and original returns.
+Also observe callback onError(Throwable) for message-free cause classes.
+
+Version-bind live queries to the requesting app version, and invalidate stored
+query state when the explicit reload begins, preventing stale replies from being
+presented as the current query after an upgrade or process reload.

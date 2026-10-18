@@ -133,6 +133,7 @@ public final class PixelBoardModule extends XposedModule {
         try { pkg = context.getPackageManager().getPackageInfo(packageName, 0); }
         catch (android.content.pm.PackageManager.NameNotFoundException e) { return; }
         if ("com.google.android.as.oss".equals(packageName)) {
+            observeAstreaAttestation(loader, context);
             AstreaFlagResolver.Binding binding;
             try { binding = AstreaFlagResolver.resolve(context, loader); }
             catch (Exception | LinkageError e) {
@@ -287,6 +288,43 @@ public final class PixelBoardModule extends XposedModule {
     }
 
 
+
+
+    private void observeAstreaAttestation(ClassLoader loader, Context context) {
+        try {
+            Class<?> callback = Class.forName(
+                    "com.google.android.apps.miphone.astrea.privateinference.library.bsa.jni."
+                    + "BlindSignAuthJniBridge$NativeAttestAndSignCallback", false, loader);
+            Method data = callback.getDeclaredMethod("onAttestationData", byte[][].class, byte[].class);
+            if (data.getReturnType() != void.class || java.lang.reflect.Modifier.isNative(data.getModifiers()))
+                throw new NoSuchMethodException("Unexpected attestation callback");
+            AtomicInteger captures = new AtomicInteger();
+            hook(data).intercept(chain -> {
+                try {
+                    if (captures.incrementAndGet() <= 4 && chain.getArgs().size() == 2
+                            && chain.getArgs().get(0) instanceof byte[][])
+                        recordStatus(context, "ASTREA_ATTESTATION",
+                                AttestationMetadata.describe((byte[][]) chain.getArgs().get(0)));
+                } catch (RuntimeException | LinkageError ignored) { }
+                return chain.proceed();
+            });
+            Method error = callback.getDeclaredMethod("onError", Throwable.class);
+            AtomicInteger failures = new AtomicInteger();
+            hook(error).intercept(chain -> {
+                try {
+                    if (failures.incrementAndGet() <= 4 && !chain.getArgs().isEmpty()
+                            && chain.getArgs().get(0) instanceof Throwable)
+                        recordStatus(context, "ASTREA_ATTESTATION",
+                                "generation_callback=error "
+                                + RuntimeErrorMetadata.describe((Throwable) chain.getArgs().get(0)));
+                } catch (RuntimeException | LinkageError ignored) { }
+                return chain.proceed();
+            });
+            recordStatus(context, "V2_DIAGNOSTICS_READY", "Astrea attestation metadata observer; read_only=true");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            recordStatus(context, "V2_DIAGNOSTICS_FAILED", "attestation_observer=" + e.getClass().getSimpleName());
+        }
+    }
 
     private void observeAstreaErrors(ClassLoader loader) {
         try {

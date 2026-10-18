@@ -33,7 +33,8 @@ public final class RuntimeProbe {
     public static void request(Context context) {
         android.content.SharedPreferences prefs = context.getSharedPreferences(RuntimeStatus.PREFS, 0);
         String nonce = java.util.UUID.randomUUID().toString();
-        prefs.edit().putString("probe_nonce", nonce).putString("probe_reply", "")
+        prefs.edit().putString("probe_client_version", BuildConfig.VERSION_NAME)
+                .putString("probe_nonce", nonce).putString("probe_reply", "")
                 .putLong("probe_time", System.currentTimeMillis()).apply();
         if (Build.VERSION.SDK_INT < 34) return;
         Intent intent = new Intent(RuntimeStatus.PING).setPackage(RuntimeStatus.GBOARD);
