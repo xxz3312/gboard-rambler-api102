@@ -30,9 +30,20 @@ public final class WritingToolsDiagnostics {
             }
         }
         probeSignals(loader);
+        probeGetter(loader);
         Log.i(TAG, "WritingTools 18.0.3 probe: " + matched + "/" + targets.length
                 + " signatures found; no initialization/signal hooks installed");
     }
+    private static void probeGetter(ClassLoader loader) {
+        RamblerFlagBindings.Binding binding = RamblerFlagBindings.resolveUnique(loader);
+        if (binding == null) {
+            Log.w(TAG, "WritingTools getter: no unique typed binding; runtime overrides unavailable");
+        } else {
+            Log.i(TAG, "WritingTools getter: unique typed binding " + binding.profile
+                    + " / " + binding.owner + " (method not invoked by probe)");
+        }
+    }
+
     private static void probeSignals(ClassLoader loader) {
         // PixelBoard runtime targets. Resolve identity without reading or changing results.
         String[][] specs = {{"gvu", "a"}, {"lvi", "b"}, {"gqd", "a"}};
