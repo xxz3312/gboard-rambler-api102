@@ -1,10 +1,8 @@
-name: Debug verification
+name: Android CI (manual only)
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 jobs:
-  debug:
+  build:
     runs-on: ubuntu-latest
     permissions: {contents: read}
     steps:
