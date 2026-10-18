@@ -3,6 +3,7 @@ package dev.kaede.pixelboard;
 import android.content.Context;
 import android.app.Application;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import android.os.Build;
 import android.util.Log;
 import java.lang.reflect.Method;
@@ -15,6 +16,7 @@ public final class PixelBoardModule extends XposedModule {
     private static final String GBOARD = "com.google.android.inputmethod.latin";
 
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
+    private final AtomicInteger writingFlagLogCount = new AtomicInteger(0);
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
         Log.i(TAG, "PixelBoard API102 entry loaded");
@@ -137,6 +139,12 @@ public final class PixelBoardModule extends XposedModule {
                     if (context == null) return original;
                     // Only if explicitly enabled AND a known profile and host context match.
                     Object writingResult = WritingToolsFlagPolicy.transform(flag, original, context);
+                    if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.targeted(flag)
+                            && writingFlagLogCount.incrementAndGet() <= 40) {
+                        Log.i(TAG, "WritingTools flag observed: " + flag
+                                + " type=" + (original == null ? "null" : original.getClass().getSimpleName())
+                                + " changed=" + !java.util.Objects.equals(original, writingResult));
+                    }
                     return RamblerFlagPolicy.transform(flag, writingResult, context);
                 } catch (ReflectiveOperationException | RuntimeException e) {
                     Log.w(TAG, "Flag transform failed; stock value returned", e);
