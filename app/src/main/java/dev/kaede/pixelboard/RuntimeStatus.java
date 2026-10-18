@@ -9,6 +9,8 @@ import android.os.Process;
 
 /** Explicit, asynchronous status delivery with an OS-authenticated sender identity. */
 public final class RuntimeStatus {
+    private static final RuntimeEventCache CACHE = new RuntimeEventCache();
+    static String cachedEvents() { return CACHE.snapshot(); }
     public static final String ACTION = "dev.kaede.pixelboard.RUNTIME_STATUS";
     public static final String PING = "dev.kaede.pixelboard.RUNTIME_PING";
     public static final String GBOARD = "com.google.android.inputmethod.latin";
@@ -21,6 +23,13 @@ public final class RuntimeStatus {
 
     public static void send(Context context, String event, String detail, String requestId) {
         if (context == null || Build.VERSION.SDK_INT < 34 || !RuntimeStatusFormat.allowedEvent(event)) return;
+        // Preserve event time even if the OEM defers or drops the status broadcast.
+        try {
+            String time = new java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(new java.util.Date());
+            CACHE.put(event, time + " pid=" + Process.myPid() + " " + event + " "
+                    + RuntimeStatusFormat.metadata(detail));
+        } catch (RuntimeException ignored) { }
         try {
             Intent intent = new Intent(ACTION).setComponent(new ComponentName(
                     "dev.kaede.pixelboard", "dev.kaede.pixelboard.RuntimeStatusReceiver"));
@@ -37,3 +46,4 @@ public final class RuntimeStatus {
         }
     }
 }
+

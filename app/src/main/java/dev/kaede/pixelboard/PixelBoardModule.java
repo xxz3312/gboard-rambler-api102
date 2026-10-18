@@ -135,6 +135,7 @@ public final class PixelBoardModule extends XposedModule {
         backendStartup.start(packageName, context.getPackageName(), () -> {
             recordStatus(context, "BACKEND_PACKAGE", "source=" + source
                     + " process=" + Application.getProcessName());
+            RuntimeProbe.installBackend(context);
             try {
                 FeatureConfig.initialize(this);
                 boolean requested = FeatureConfig.writingToolsV2();

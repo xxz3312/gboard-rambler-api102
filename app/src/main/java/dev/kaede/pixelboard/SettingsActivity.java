@@ -92,7 +92,7 @@ public final class SettingsActivity extends Activity {
         channelTest.setOnClickListener(v -> RuntimeStatus.send(this, "CHANNEL_TEST", "transport_only=true"));
         list.addView(channelTest);
         android.widget.Button live = new android.widget.Button(this);
-        live.setText("查询当前 Gboard（实时应答）");
+        live.setText("查询 Gboard 与 PCS（实时应答）");
         live.setOnClickListener(v -> {
             try { RuntimeProbe.request(this); }
             catch (RuntimeException e) {
@@ -110,7 +110,7 @@ public final class SettingsActivity extends Activity {
             reload.setEnabled(false);
             runtimePrefs.edit().putString("reload_result", "正在请求 Root 并停止目标进程…")
                     .remove("probe_client_version").remove("probe_nonce")
-                    .remove("probe_reply").remove("probe_time").apply();
+                    .remove("probe_reply").remove("probe_time").remove("pcs_probe_reply").apply();
             android.content.Context app = getApplicationContext();
             new Thread(() -> {
                 String result = RuntimeReload.run();
@@ -162,6 +162,11 @@ public final class SettingsActivity extends Activity {
                         : "尚未查询。请唤起 Gboard 后点击实时查询。")
                 + (prefs.getInt("writing_tools_backend", 2) == 3
                         ? "\nAstrea READY 仅为前置开关检查；请以实际请求的 V2_RESPONSE / V2_ASTREA_ERROR 为准。" : "")
+                + "\n本次 PCS 主动查询：\n" + (requested
+                        ? runtimePrefs.getString("pcs_probe_reply", "").isEmpty()
+                                ? "等待本次 PCS 查询结果；请保持模块界面在前台。"
+                                : runtimePrefs.getString("pcs_probe_reply", "")
+                        : "尚未查询。先执行一次写作工具请求，再点击实时查询。")
                 + "\n当前版本启动事件：\n" + (attached.isEmpty() ? "尚未收到。" : attached)
                 + "\n本版本最近 PCS 事件（按事件时间与 PID 判断）：\n" + backendEvents(version)
                 + "\nRoot 重载结果：\n" + runtimePrefs.getString("reload_result", "尚未执行。")
@@ -179,7 +184,7 @@ public final class SettingsActivity extends Activity {
             String line = runtimePrefs.getString(prefix + event, "");
             if (!line.isEmpty()) out.append(line).append("\n");
         }
-        return out.length() == 0 ? "尚未收到 PCS 事件；当前无法验证 PCS 观察器。"
+        return out.length() == 0 ? "后台事件通道尚未收到 PCS 事件；请参考上方主动查询或 LSPosed 日志，不能据此判定观察器未生效。"
                 : out.toString();
     }
 
@@ -202,3 +207,4 @@ public final class SettingsActivity extends Activity {
         parent.addView(t);
     }
 }
+

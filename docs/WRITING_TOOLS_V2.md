@@ -273,6 +273,32 @@ Version-bind live queries to the requesting app version, and invalidate stored
 query state when the explicit reload begins, preventing stale replies from being
 presented as the current query after an upgrade or process reload.
 
+## 0.1.17 PCS foreground query
+
+Full LSPosed logs confirmed that 0.1.15 and 0.1.16 already initialized PCS,
+installed the semantic resolver and captured attestation metadata. Missing app UI
+events were not evidence of missing injection. The OEM also logged cached-process
+status broadcast denials. Do not infer injection failure from an empty UI history.
+
+Each host now retains the latest metadata event per type in process memory (16
+types, 512 characters per line, original event time). PCS installs a read-only
+ordered query receiver before configuration/preflight. The foreground module's
+existing query button also queries the running PCS process. Results return through
+the ordered broadcast result callback, rather than a new PCS-to-module broadcast.
+The target package is explicit; the host checks the OS-provided caller identity.
+Replies are bound to the current nonce and module version. Reload or a newer query
+invalidates older replies. An absent response is inconclusive. The query does not
+start PCS, run inference, or persist host metadata outside process memory.
+
+Result delivery on affected OEM firmware still needs device validation. The report
+labels cached event timestamps and PID separately from current query completion.
+It does not label cached proof or READY as successful inference.
+
+The supplied logs showed X.509 proof data reporting TEE, deviceLocked=false and
+UNVERIFIED, followed by server AttestAndSign PERMISSION_DENIED. Parsing does not
+validate the certificate chain or establish the server's rejection policy. No
+certificate, clock, authentication token, proof state or RPC result is overridden.
+
 ## 0.1.16 backend initialization
 
 PCS/AICore previously relied only on Application.attach, unlike the existing
@@ -290,3 +316,4 @@ metadata above the rolling event history. These are timestamped historical recor
 with PIDs, not a claim that a backend process is currently alive.
 
 The explicit Root reload report now records before/after PIDs for each of the three targets, rather than only Gboard, so an exit code cannot conceal an unchanged PCS process.
+
