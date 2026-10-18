@@ -46,7 +46,7 @@ public final class WritingToolsDiagnostics {
 
     private static void probeSignals(ClassLoader loader) {
         // PixelBoard runtime targets. Resolve identity without reading or changing results.
-        String[][] specs = {{"gvu", "a"}, {"lvi", "b"}, {"gqd", "a"}};
+        // On 18.4.1, lvi#b is a long field, not a signal object.\n        // gqd#a was not verified; do not treat it as a forced signal.\n        String[][] specs = {{"gvu", "a"}};
         for (String[] spec : specs) {
             try {
                 Class<?> owner = Class.forName(spec[0], false, loader);
@@ -55,7 +55,7 @@ public final class WritingToolsDiagnostics {
                     Log.i(TAG, "WritingTools signal rejected non-static: " + spec[0] + "#" + spec[1]);
                     continue;
                 }
-                Log.i(TAG, "WritingTools signal descriptor found: " + spec[0] + "#" + spec[1]
+                Log.i(TAG, "WritingTools candidate field descriptor (not a verified signal): " + spec[0] + "#" + spec[1]
                         + " type=" + field.getType().getName());
             } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
                 Log.i(TAG, "WritingTools signal unavailable: " + spec[0] + "#" + spec[1]);
