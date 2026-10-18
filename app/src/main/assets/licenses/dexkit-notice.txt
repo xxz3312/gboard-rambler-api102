@@ -1,0 +1,5 @@
+DexKit 2.3.0, Copyright LuckyPray.
+Project and corresponding source: https://github.com/LuckyPray/DexKit/tree/2.3.0
+Java/Kotlin components: Apache License 2.0.
+Native Core components: GNU Lesser General Public License v3.0.
+The library is redistributed unmodified as a separate shared library.

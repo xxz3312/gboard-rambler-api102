@@ -221,3 +221,33 @@ to PRIVATE_INFERENCE_INTERNAL_ERROR. Extract only the gRPC status enum through t
 same abdv.c(Throwable) adapter used by Gboard, and up to four cause class names.
 Never log exception messages, operation arguments, request text or credentials.
 The original handler and its returned future remain unchanged.
+
+## 0.1.14 semantic Astrea binding
+
+Remove PCS version allowlists and obfuscated names from the protected-download hook.
+DexKit 2.3.0 locates classes containing the DeviceFlagManager semantic log marker, then requires
+a concrete instance String(String) method that calls DeviceConfig.getProperty and
+Binder.clearCallingIdentity / restoreCallingIdentity. Hook only that unique method,
+and override only the exact key ProtectedDownload__enabled. Zero/multiple matches,
+native loading failures or unexpected structure keep stock behavior and emit V2_PROFILE_FAILED.
+
+Cache discovered owner/method in PCS private preferences under a revisioned SHA-256
+fingerprint of the base APK. A changed APK or resolver revision rescans; cache hits
+still validate the reflected method structure. DexKit bridges close after scanning.
+This resolver currently searches the base APK; moving the implementation into a
+code split will produce a diagnostic failure and require a resolver update.
+
+Offline analysis of supplied APKs confirms unique equivalent matches:
+116015 / 1.0.release.825068975 -> efh.g(String):String;
+149829 / 1.0.release.993595852 -> fqj.i(String):String.
+These names are verification observations, not runtime inputs.
+
+The old res/K7.binarypb verification keys expire at 2026-05-05T10:49:59.626023Z.
+The supplied 149829 base APK's res/K7.binarypb expires at
+2027-03-17T09:33:41.251153Z. Bundle SHA-256:
+cf7db577af3496e7f7b574e279b0f68be4daeb9a8852e9b43bd276914a24b0c2;
+base APK signer SHA-256:
+071f09456bf1a8e8ad2e808ffe6a0ebc13582a7e6f9aba13e47280ad9a85d833.
+No clock, keys, expiry, remote attestation, authentication or endpoints are overridden.
+A newer PCS package still needs on-device RPC/inference validation.
+Other Gboard and AICore hooks retain their existing explicit profiles.

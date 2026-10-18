@@ -133,25 +133,28 @@ public final class PixelBoardModule extends XposedModule {
         try { pkg = context.getPackageManager().getPackageInfo(packageName, 0); }
         catch (android.content.pm.PackageManager.NameNotFoundException e) { return; }
         if ("com.google.android.as.oss".equals(packageName)) {
-            if (pkg.getLongVersionCode() != 116015L
-                    || !"1.0.release.825068975".equals(pkg.versionName)) {
-                Log.w(TAG, "V2 Astrea version unsupported; stock behavior retained");
+            AstreaFlagResolver.Binding binding;
+            try { binding = AstreaFlagResolver.resolve(context, loader); }
+            catch (Exception | LinkageError e) {
+                recordStatus(context, "V2_PROFILE_FAILED", "Astrea semantic resolver="
+                        + e.getClass().getSimpleName());
+                Log.w(TAG, "Astrea semantic binding rejected; stock behavior retained", e);
                 return;
             }
-            Method flag = new TargetMethod("efh", "g", "java.lang.String", "java.lang.String").resolve(loader);
             AtomicBoolean logged = new AtomicBoolean();
-            hook(flag).intercept(chain -> {
+            hook(binding.method).intercept(chain -> {
                 if (chain.getArgs().size() == 1
                         && "ProtectedDownload__enabled".equals(chain.getArgs().get(0))) {
-                    if (logged.compareAndSet(false, true)) {
-                        Log.i(TAG, "V2 Astrea protected download flag applied; request acceptance unverified");
-                        recordStatus(context, "ASTREA_FLAG", "ProtectedDownload__enabled=true");
-                    }
+                    if (logged.compareAndSet(false, true))
+                        recordStatus(context, "ASTREA_FLAG", "ProtectedDownload__enabled=true resolver="
+                                + binding.source);
                     return "true";
                 }
                 return chain.proceed();
             });
-            Log.i(TAG, "V2 Astrea 116015 protected download hook installed");
+            recordStatus(context, "V2_DIAGNOSTICS_READY", "Astrea semantic resolver="
+                    + binding.source + " target=" + binding.method.getDeclaringClass().getName()
+                    + "." + binding.method.getName() + " version=" + pkg.getLongVersionCode());
         } else {
             if (pkg.getLongVersionCode() != 526928L
                     || !"0.release.qc8635.prod_aicore_20260917.00_RC01".equals(pkg.versionName)) {
