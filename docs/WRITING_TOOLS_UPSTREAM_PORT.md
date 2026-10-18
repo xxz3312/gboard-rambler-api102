@@ -96,3 +96,20 @@ Consequences:
   18.4.1 toolbar flag xref is a more reliable path.
 
 Further parsed exact DEX descriptors: `Lplx;->n:Lodr;` and `Lpmb;->n(Lnsn;)Ljava/lang/String;`. Thus `pmb.n` is **not a Boolean availability gate**, despite reading the toolbar flag; it may use the flag in string-producing logic. Added read-only, exact signature check and will not force its return value.
+
+## 18.4.1 passive toolbar-consumer observation
+
+Installed an opt-in, read-only API 102 interceptor for verified
+`Lpmb;->n(Lnsn;)Ljava/lang/String;` on the staging branch.
+It calls `chain.proceed()` and returns the original result unchanged,
+logging only bounded invocation counts and whether the result was null.
+It never logs text, arguments, or returned strings.
+
+An observed invocation will establish that the method is active in the
+user's runtime, **not** that it is a UI eligibility/visibility gate.
+The existing APK signature maps it to a string-producing consumer of
+`Lplx;->n:Lodr;`. No value/eligibility force is performed.
+
+The short supplied log from 2026-10-18 only contained repeated
+`enable_writing_tools_v2` observations; it did not show toolbar gate
+reads. It predates this observer and cannot prove non-execution.
