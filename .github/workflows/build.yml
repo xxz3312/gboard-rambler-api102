@@ -22,7 +22,7 @@ jobs:
           else
             echo "sdkmanager missing"; exit 1
           fi
-      - run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace --no-daemon
       - uses: actions/upload-artifact@v4
         if: success()
         with:

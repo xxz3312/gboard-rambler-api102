@@ -17,7 +17,7 @@ public final class PixelBoardModule extends XposedModule {
     private static final String GBOARD = "com.google.android.inputmethod.latin";
 
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
-    private final AtomicInteger writingFlagLogCount = new AtomicInteger(0);
+    private final java.util.Set<String> writingFlagsLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
     private final AtomicInteger toolbarConsumerLogCount = new AtomicInteger(0);
     private volatile Context hostContext;
@@ -85,7 +85,7 @@ public final class PixelBoardModule extends XposedModule {
             else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
         }
         if (FeatureConfig.writingTools())
-            Log.i(TAG, "Writing Tools experimental override installed only if shared getter was resolved; toolbar is not guaranteed");
+            Log.i(TAG, "Writing Tools policy=basic-cloud-v1; V2=false, backend=GBOARD_SERVER, hybrid=false, onDeviceProofread=false; overrides require resolved getter; UI/backend unverified");
     }
 
     private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
@@ -162,7 +162,7 @@ public final class PixelBoardModule extends XposedModule {
                                     + " changed=" + !java.util.Objects.equals(original, writingResult));
                     }
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.targeted(flag)
-                            && writingFlagLogCount.incrementAndGet() <= 40) {
+                            && writingFlagsLogged.add(flag)) {
                         Log.i(TAG, "WritingTools flag observed: " + flag
                                 + " type=" + (original == null ? "null" : original.getClass().getSimpleName())
                                 + " changed=" + !java.util.Objects.equals(original, writingResult));

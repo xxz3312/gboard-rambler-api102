@@ -7,7 +7,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Runtime-only subset of PixelBoard's Writing Tools flag policy (GPL-3.0).
+ * Basic cloud Writing Tools policy adapted from Akshayykadam/PixelBoard (GPL-3.0).
  * Never spoof hardware, consent, model availability or Google service endpoints.
  */
 public final class WritingToolsFlagPolicy {
@@ -23,12 +23,14 @@ public final class WritingToolsFlagPolicy {
             "writing_helper",
             "enable_nga_lab_modeless_smartedit"
         )));
-    // Runtime-only cloud-capable entry gates from PixelBoard.
-    // Don't enable on-device-only styling and Gemini Nano features on Xiaomi.
-    private static final Set<String> CLOUD_ENTRY = Collections.unmodifiableSet(
+    // Match the upstream default: basic cloud tools, with V2 disabled.
+    private static final Set<String> V2_DISABLED = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
             "enable_writing_tools_v2",
             "enable_writing_tools_v2_on_toolbar",
+            "enable_writing_tools_suggest_style",
+            "enable_writing_tools_my_style",
+            "enable_writing_tools_my_style_plus",
             "writing_tools_v2",
             "writing_tools_v2_enable_suggested_instructions",
             "writing_tools_v2_enable_suggested_instructions_in_draft_response",
@@ -36,25 +38,41 @@ public final class WritingToolsFlagPolicy {
             "writing_tools_v2_allow_empty_user_instruction",
             "writing_tools_v2_show_predefined_prompts"
         )));
+    private static final Set<String> LANGUAGE_FLAGS = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList(
+            "writing_helper_supported_language_tags", "llm_pc_supported_language_tags"
+        )));
     public static boolean targeted(String name) {
-        return name != null && (LEGACY.contains(name) || CLOUD_ENTRY.contains(name)
+        return name != null && (LEGACY.contains(name) || V2_DISABLED.contains(name)
+                || LANGUAGE_FLAGS.contains(name)
+                || "writing_tools_enable_hybrid".equals(name)
+                || "enable_on_device_proofread".equals(name)
                 || "enable_writing_tools_voice_commands".equals(name)
+                || "nga_lab_modeless_smartedit_regex_version".equals(name)
                 || "writing_tools_v2_backend_type".equals(name));
     }
     public static boolean isToolbarFlag(String name) {
         return "enable_writing_tools_v2_on_toolbar".equals(name);
     }
     public static Object transform(String name, Object original, Context context) {
-        if (!FeatureConfig.writingTools() || context == null || !targeted(name))
-            return original;
+        return overrideValue(name, original, context != null && FeatureConfig.writingTools());
+    }
+
+    // Pure typed policy, also exercised by host-side regression tests.
+    static Object overrideValue(String name, Object original, boolean enabled) {
+        if (!enabled || !targeted(name)) return original;
         if ("writing_tools_v2_backend_type".equals(name))
             return original instanceof Long ? Long.valueOf(1L) : original;
+        if (LANGUAGE_FLAGS.contains(name))
+            return original instanceof String ? "*" : original;
+        if ("nga_lab_modeless_smartedit_regex_version".equals(name))
+            return original instanceof String && ((String) original).isEmpty() ? "v3" : original;
         if (!(original instanceof Boolean)) return original;
-        if (LEGACY.contains(name) || CLOUD_ENTRY.contains(name)
-                || "enable_writing_tools_voice_commands".equals(name))
+        if (V2_DISABLED.contains(name) || "writing_tools_enable_hybrid".equals(name)
+                || "enable_on_device_proofread".equals(name))
+            return Boolean.FALSE;
+        if (LEGACY.contains(name) || "enable_writing_tools_voice_commands".equals(name))
             return Boolean.TRUE;
-        // Do not enable device-only features or alter server endpoints, eligibility,
-        // user consent, age, AICore or model-download state.
         return original;
     }
 }
