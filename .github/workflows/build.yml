@@ -2,7 +2,7 @@ name: Android CI
 on:
   workflow_dispatch:
   push:
-    branches: [main, writing-tools-upstream-port]
+    branches: [main, writing-tools-upstream-port, writing-tools-v2-experiment]
 jobs:
   debug:
     runs-on: ubuntu-latest

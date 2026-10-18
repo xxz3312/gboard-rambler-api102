@@ -66,4 +66,49 @@ public final class WritingToolsFlagPolicyTest {
             assertSame(original, apply(flag, original));
         }
     }
+
+    @Test public void privateBackendsHaveDistinctPoliciesAndCanBeDisabled() {
+        for (int backend : new int[] {2, 3}) {
+            for (String flag : OFF) {
+                boolean expected = !"enable_on_device_proofread".equals(flag) || backend == 2;
+                assertEquals(flag, Boolean.valueOf(expected),
+                        WritingToolsFlagPolicy.overrideValue(flag, Boolean.FALSE, true, true, backend));
+                assertEquals(flag, apply(flag, Boolean.FALSE),
+                        WritingToolsFlagPolicy.overrideValue(flag, Boolean.FALSE, true, false, backend));
+            }
+            assertEquals(Long.valueOf(backend), WritingToolsFlagPolicy.overrideValue(
+                    "writing_tools_v2_backend_type", Long.valueOf(1), true, true, backend));
+            assertEquals(Long.valueOf(1), WritingToolsFlagPolicy.overrideValue(
+                    "writing_tools_v2_backend_type", Long.valueOf(3), true, false, backend));
+        }
+    }
+
+    @Test public void v2CannotOverrideDisabledFeatureOrUntargetedEligibility() {
+        for (int backend : new int[] {2, 3}) {
+            for (String[] flags : new String[][] {BASIC, OFF, {"writing_tools_v2_backend_type"}})
+                for (String flag : flags)
+                    for (Object original : new Object[] {null, Boolean.FALSE, Long.valueOf(1), "original"})
+                        assertSame(original, WritingToolsFlagPolicy.overrideValue(
+                                flag, original, false, true, backend));
+            for (String flag : new String[] {"enable_writing_tools_for_minors", "model_ready",
+                    "writing_tools_pi_model_id_override", "writing_tools_pi_aicore_feature_id_override"}) {
+                Object original = new Object();
+                assertSame(original, WritingToolsFlagPolicy.overrideValue(flag, original, true, true, backend));
+            }
+            assertEquals(Integer.valueOf(1), WritingToolsFlagPolicy.overrideValue(
+                    "writing_tools_v2_backend_type", Integer.valueOf(1), true, true, backend));
+            assertEquals("false", WritingToolsFlagPolicy.overrideValue(
+                    "enable_writing_tools_v2", "false", true, true, backend));
+        }
+    }
+
+    @Test public void unknownBackendRetainsBasicCloudPolicy() {
+        for (int backend : new int[] {-1, 0, 1, 4, 999}) {
+            assertEquals(Long.valueOf(1), WritingToolsFlagPolicy.overrideValue(
+                    "writing_tools_v2_backend_type", Long.valueOf(3), true, true, backend));
+            for (String flag : OFF)
+                assertEquals(Boolean.FALSE, WritingToolsFlagPolicy.overrideValue(
+                        flag, Boolean.TRUE, true, true, backend));
+        }
+    }
 }

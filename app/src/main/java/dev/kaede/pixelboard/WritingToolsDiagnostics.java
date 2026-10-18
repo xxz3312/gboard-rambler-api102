@@ -54,12 +54,10 @@ public final class WritingToolsDiagnostics {
                 Log.w(TAG, "WritingTools 18.4.1 toolbar flag descriptor differs from APK");
                 return;
             }
-            Method consumer = new TargetMethod("pmb", "n", "java.lang.String", "nsn")
-                    .resolve(loader);
-            Log.i(TAG, "WritingTools 18.4.1 toolbar flag plx#n (odr), "
-                    + "reader pmb#n(nsn):String verified; no hook installed");
+            Log.i(TAG, "WritingTools 18.4.1 toolbar flag plx#n (odr) descriptor found; "
+                    + "pmb#n is unrelated and is not used as a consumer");
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            Log.i(TAG, "WritingTools 18.4.1 toolbar reader descriptor not found");
+            Log.i(TAG, "WritingTools 18.4.1 toolbar flag descriptor not found");
         }
     }
 

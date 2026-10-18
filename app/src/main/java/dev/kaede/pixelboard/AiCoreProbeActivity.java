@@ -45,13 +45,13 @@ public final class AiCoreProbeActivity extends Activity {
         list.setPadding(pad, pad, pad, pad);
         root.addView(list);
         TextView title = new TextView(this);
-        title.setText("AICore 本地写作能力检测");
+        title.setText("V2 后端信息与公开 API 检测");
         title.setTextSize(22);
         list.addView(title);
         TextView explanation = new TextView(this);
-        explanation.setText("检测英语校对和英语正式语气改写的官方 API 状态。"
+        explanation.setText("检测 607/614 公开 API 状态，并显示后端包与绑定权限。"
                 + "请保持此页在前台。检测不会主动下载模型或提交推理请求，也不会切换 Gboard 后端。"
-                + "\n结果仅代表本模块调用公开 API 的能力，不代表 Gboard 私有后端或 Astrea 可用。");
+                + "\nGboard V2 的私有推理另用 Feature 703；607/614 的结果不能判定它是否可用。");
         list.addView(explanation);
         check = new Button(this);
         check.setText("开始检测");
@@ -73,7 +73,7 @@ public final class AiCoreProbeActivity extends Activity {
             report.setText(savedInstanceState.getString("report", "")
                     + "\n页面已恢复；如检测未完成，请重新检测。");
         } else {
-            report.setText("点击开始检测。");
+            report.setText(deviceReport() + "\n点击开始检测仅查询公开 API，不验证 V2 推理。");
         }
         list.addView(report);
         setContentView(root);
@@ -99,7 +99,7 @@ public final class AiCoreProbeActivity extends Activity {
                 if (!active || token != generation || isDestroyed()) return;
                 report.append("\n检测结束。AVAILABLE 只表示该 API 配置已就绪；"
                         + "DOWNLOADABLE 表示可请求下载；UNAVAILABLE 或异常需要进一步分析。"
-                        + "\nAstrea：本检测未验证。Gboard：仍使用原来的云端配置。");
+                        + "\nV2 真实请求、来源及返回状态请以 Gboard 实际操作和 PixelBoardLS 日志为准。");
                 busy = false;
                 check.setEnabled(true);
             });
@@ -107,7 +107,17 @@ public final class AiCoreProbeActivity extends Activity {
     }
 
     private String deviceReport() {
-        StringBuilder text = new StringBuilder("版本：0.1.6-build22347-test\n");
+        StringBuilder text = new StringBuilder();
+        try {
+            text.append("模块版本：").append(getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
+        } catch (PackageManager.NameNotFoundException ignored) { }
+        text.append("\n");
+        android.content.SharedPreferences settings = getSharedPreferences(FeatureConfig.GROUP, MODE_PRIVATE);
+        boolean requested = settings.getBoolean("writing_tools", false)
+                && settings.getBoolean("writing_tools_v2", false);
+        text.append("保存配置：").append(requested ? "V2 实验，后端="
+                + (settings.getInt("writing_tools_backend", 2) == 3 ? "Astrea" : "AICore") : "基础云端")
+                .append("（Gboard 重启后读取，不代表有效运行状态）\n");
         text.append("设备：").append(Build.MANUFACTURER).append(" ")
                 .append(Build.MODEL).append(" / ").append(Build.DEVICE)
                 .append("\nAndroid API：").append(Build.VERSION.SDK_INT).append("\n");
@@ -122,12 +132,41 @@ public final class AiCoreProbeActivity extends Activity {
         } catch (RuntimeException e) {
             text.append("AICore 包查询异常：").append(describe(e));
         }
+        appendPackage(text, "Gboard", "com.google.android.inputmethod.latin");
+        appendPackage(text, "Astrea / Private Compute Services", "com.google.android.as.oss");
+        appendAstreaService(text);
         appendBindingReport(text);
         text.append("\n注意：官方文档不支持解锁 Bootloader 的设备；"
                 + "服务初始化、机型、语言和模型配置也会影响结果。\n");
         return text.toString();
     }
 
+
+
+    private void appendPackage(StringBuilder text, String title, String packageName) {
+        try {
+            PackageInfo p = getPackageManager().getPackageInfo(packageName, 0);
+            text.append("\n").append(title).append("：").append(p.versionName)
+                    .append(" (").append(p.getLongVersionCode()).append(")");
+        } catch (PackageManager.NameNotFoundException | RuntimeException e) {
+            text.append("\n").append(title).append("：未找到或不可见");
+        }
+    }
+
+    private void appendAstreaService(StringBuilder text) {
+        try {
+            android.content.pm.ServiceInfo service = getPackageManager().getServiceInfo(
+                    new android.content.ComponentName("com.google.android.as.oss",
+                            "com.google.android.apps.miphone.astrea.grpc.AstreaGrpcService"),
+                    PackageManager.MATCH_DISABLED_COMPONENTS);
+            text.append("\nAstrea 服务：enabled=").append(service.enabled)
+                    .append(", exported=").append(service.exported)
+                    .append(", permission=").append(service.permission == null ? "(无)" : service.permission)
+                    .append("（仅验证声明，不代表 RPC 或推理成功）");
+        } catch (PackageManager.NameNotFoundException | RuntimeException e) {
+            text.append("\nAstrea 服务：未找到或不可见");
+        }
+    }
 
     private void appendBindingReport(StringBuilder text) {
         PackageManager pm = getPackageManager();

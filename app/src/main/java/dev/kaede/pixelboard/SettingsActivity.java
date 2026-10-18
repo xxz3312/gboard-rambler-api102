@@ -27,7 +27,33 @@ public final class SettingsActivity extends Activity {
         addToggle(list,"rambler","Rambler (experimental)","May alter eligible Gboard feature flags; not verified.");
         addToggle(list,"spellchecker","Inline spellchecker (experimental)","Obfuscated method mapping needs on-device validation.");
         addToggle(list,"diagnostics","Diagnostic hooks","Observe selection and emit Android logcat messages.");
-        addToggle(list,"writing_tools","AI 写作工具 · 基础云端测试版","使用 Google 云端校对/改写，关闭 V2 和本地推理。入口及服务响应仍待实测；修改后需强制停止并重新打开 Gboard。建议先在便签中使用英语测试，默认校对应用排除列表包含 ChatGPT。");
+        addToggle(list,"writing_tools","AI 写作工具 · 总开关","默认使用基础云端校对/改写；V2 需另行开启。0.1.7 已验证入口及英语校对；修改后需强制停止并重新打开 Gboard。建议先在便签中使用英语测试，默认校对应用排除列表包含 ChatGPT。");
+        addToggle(list, "writing_tools_v2", "Writing Tools V2 · 实验模式",
+                "需同时开启 AI 写作工具。仅适配 Gboard 18.4.1.985164140（176027078）。"
+                + "可能触发官方模型准备或下载，需要完成 Gboard 自身的使用同意。"
+                + "后端不可用时，关闭本开关并重启 Gboard 即可恢复基础云端模式。");
+        addText(list, "V2 后端（仅实验模式生效）", true);
+        android.widget.RadioGroup backends = new android.widget.RadioGroup(this);
+        android.widget.RadioButton aicore = new android.widget.RadioButton(this);
+        aicore.setId(View.generateViewId());
+        aicore.setText("AICore 私有推理（可能结合端侧模型）");
+        android.widget.RadioButton astrea = new android.widget.RadioButton(this);
+        astrea.setId(View.generateViewId());
+        astrea.setText("Astrea 私有推理（需要联网）");
+        backends.addView(aicore);
+        backends.addView(astrea);
+        backends.check(prefs.getInt("writing_tools_backend", 2) == 3 ? astrea.getId() : aicore.getId());
+        backends.setOnCheckedChangeListener((group, id) -> {
+            prefs.edit().putInt("writing_tools_backend", id == astrea.getId() ? 3 : 2).apply();
+            ((ModuleApp) getApplication()).sync();
+        });
+        list.addView(backends);
+        addText(list, "实验作用域：Gboard、AICore、Private Compute Services。"
+                + "关闭 V2 时，不修改 AICore/Astrea。选择后端只改变请求路径，不代表模型、账号或服务已可用。", false);
+        android.widget.Button status = new android.widget.Button(this);
+        status.setText("后端信息与公开 API 检测");
+        status.setOnClickListener(v -> startActivity(new android.content.Intent(this, AiCoreProbeActivity.class)));
+        list.addView(status);
         addText(list, "LSPosed framework service: " + (((ModuleApp)getApplication()).connected() ? "connected" : "not connected") + ". Configuration sync is retried upon connection.", false);
         addText(list, "Logcat filter: PixelBoardLS. Toggle state is not proof of successful Hook installation.", false);
         setContentView(root);

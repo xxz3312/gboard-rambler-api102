@@ -4,24 +4,30 @@ import android.content.SharedPreferences;
 import android.util.Log;
 import io.github.libxposed.api.XposedModule;
 
-/** Read-only framework-backed config in hooked Gboard. No ContentProvider IPC. */
+/** Read-only framework-backed config in hooked target processes. No ContentProvider IPC. */
 public final class FeatureConfig {
     private static final String TAG = "PixelBoardLS";
     public static final String GROUP = "features";
-    private static volatile boolean rambler, spellchecker, diagnostics, writingTools;
+    private static volatile boolean rambler, spellchecker, diagnostics, writingTools, writingToolsV2;
+    private static volatile int writingToolsBackend = 2;
     private FeatureConfig() {}
     public static void initialize(XposedModule module) {
-        rambler = spellchecker = diagnostics = writingTools = false;
+        rambler = spellchecker = diagnostics = writingTools = writingToolsV2 = false;
+        writingToolsBackend = 2;
         try {
             SharedPreferences p = module.getRemotePreferences(GROUP);
             rambler = p.getBoolean("rambler", false);
             spellchecker = p.getBoolean("spellchecker", false);
             diagnostics = p.getBoolean("diagnostics", false);
             writingTools = p.getBoolean("writing_tools", false);
+            writingToolsV2 = writingTools && p.getBoolean("writing_tools_v2", false);
+            writingToolsBackend = p.getInt("writing_tools_backend", 2) == 3 ? 3 : 2;
             module.log(Log.INFO, TAG, "Remote settings read: rambler=" + rambler
                     + ", diagnostics=" + diagnostics + ", spellchecker=" + spellchecker
-                    + ", writingTools=" + writingTools);
+                    + ", writingTools=" + writingTools + ", v2Requested=" + writingToolsV2
+                    + ", requestedBackend=" + writingToolsBackend);
         } catch (RuntimeException e) {
+            writingToolsV2 = false;
             module.log(Log.ERROR, TAG, "Remote settings unavailable; fail closed", e);
         }
     }
@@ -29,4 +35,6 @@ public final class FeatureConfig {
     public static boolean spellchecker() { return spellchecker; }
     public static boolean diagnostics() { return diagnostics; }
     public static boolean writingTools() { return writingTools; }
+    public static boolean writingToolsV2() { return writingToolsV2; }
+    public static int writingToolsBackend() { return writingToolsBackend; }
 }

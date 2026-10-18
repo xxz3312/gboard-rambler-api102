@@ -11,7 +11,7 @@ import java.lang.reflect.Method;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam;
 
-/** Modern LSPosed entry scoped to Gboard; local-model experiments are inactive. */
+/** API 102 entry. Basic cloud mode is the default; V2 backends require explicit opt-in. */
 public final class PixelBoardModule extends XposedModule {
     private static final String TAG = "PixelBoardLS";
     private static final String GBOARD = "com.google.android.inputmethod.latin";
@@ -20,6 +20,7 @@ public final class PixelBoardModule extends XposedModule {
     private final java.util.Set<String> writingFlagsLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
     private volatile boolean verifiedWritingTools184;
+    private volatile boolean verifiedV2;
     private volatile Context hostContext;
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
@@ -27,6 +28,11 @@ public final class PixelBoardModule extends XposedModule {
     }
 
     @Override public void onPackageReady(PackageReadyParam param) {
+        if ("com.google.android.aicore".equals(param.getPackageName())
+                || "com.google.android.as.oss".equals(param.getPackageName())) {
+            prepareExperimentalBackend(param.getPackageName(), param.getClassLoader());
+            return;
+        }
         if (!GBOARD.equals(param.getPackageName())) return;
         ClassLoader loader = param.getClassLoader();
         if (loader == null) { Log.w(TAG, "No Gboard classloader"); return; }
@@ -55,6 +61,198 @@ public final class PixelBoardModule extends XposedModule {
 
 
 
+
+    private boolean resolveV2Profile(ClassLoader loader) {
+        try {
+            new TargetMethod("oli", "b", "omd").resolve(loader);
+            new TargetMethod("ojq", "l", "xin", "java.lang.String", "int").resolve(loader);
+            new TargetMethod("oju", "h", "oju", "android.content.Context", "pxf").resolve(loader);
+            new TargetMethod("xin", "b", "void", "java.lang.Runnable",
+                    "java.util.concurrent.Executor").resolve(loader);
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            if (FeatureConfig.writingToolsV2()) Log.w(TAG, "V2 profile rejected", e);
+            return false;
+        }
+    }
+
+    private void prepareExperimentalBackend(String packageName, ClassLoader loader) {
+        if (loader == null) return;
+        try {
+            hook(Application.class.getDeclaredMethod("attach", Context.class)).intercept(chain -> {
+                Object result = chain.proceed();
+                Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
+                if (arg instanceof Context && packageName.equals(((Context) arg).getPackageName())
+                        && bootstrapped.compareAndSet(false, true)) {
+                    FeatureConfig.initialize(this);
+                    if (FeatureConfig.writingToolsV2()) {
+                        try { installExperimentalBackend(packageName, loader, (Context) arg); }
+                        catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                            Log.w(TAG, "V2 backend package hook skipped: " + packageName, e);
+                        }
+                    } else Log.i(TAG, "V2 disabled; backend process retained stock behavior");
+                }
+                return result;
+            });
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            Log.w(TAG, "V2 backend attach skipped", e);
+        }
+    }
+
+    private void installExperimentalBackend(String packageName, ClassLoader loader, Context context)
+            throws ReflectiveOperationException {
+        PackageInfo pkg;
+        try { pkg = context.getPackageManager().getPackageInfo(packageName, 0); }
+        catch (android.content.pm.PackageManager.NameNotFoundException e) { return; }
+        if ("com.google.android.as.oss".equals(packageName)) {
+            if (pkg.getLongVersionCode() != 116015L
+                    || !"1.0.release.825068975".equals(pkg.versionName)) {
+                Log.w(TAG, "V2 Astrea version unsupported; stock behavior retained");
+                return;
+            }
+            Method flag = new TargetMethod("efh", "g", "java.lang.String", "java.lang.String").resolve(loader);
+            AtomicBoolean logged = new AtomicBoolean();
+            hook(flag).intercept(chain -> {
+                if (chain.getArgs().size() == 1
+                        && "ProtectedDownload__enabled".equals(chain.getArgs().get(0))) {
+                    if (logged.compareAndSet(false, true))
+                        Log.i(TAG, "V2 Astrea protected download flag applied; request acceptance unverified");
+                    return "true";
+                }
+                return chain.proceed();
+            });
+            Log.i(TAG, "V2 Astrea 116015 protected download hook installed");
+        } else {
+            if (pkg.getLongVersionCode() != 526928L
+                    || !"0.release.qc8635.prod_aicore_20260917.00_RC01".equals(pkg.versionName)) {
+                Log.w(TAG, "V2 AICore version unsupported; manifest observer skipped");
+                return;
+            }
+            Method clientName = new TargetMethod("isz", "a", "java.lang.String").resolve(loader);
+            Method fetch = new TargetMethod("ity", "a", "java.lang.Object", "isz", "java.util.Map", "nrj")
+                    .resolve(loader);
+            AtomicInteger hits = new AtomicInteger();
+            hook(fetch).intercept(chain -> {
+                try {
+                    if (chain.getArgs().size() == 3
+                            && chain.getArgs().get(1) instanceof java.util.Map
+                            && "com.google.android.aicore:18103149225492435673"
+                                    .equals(clientName.invoke(chain.getArgs().get(0)))
+                            && hits.incrementAndGet() <= 4) {
+                        java.util.Map<?, ?> map = (java.util.Map<?, ?>) chain.getArgs().get(1);
+                        StringBuilder line = new StringBuilder("V2 AICore manifest labels (unchanged):");
+                        for (String key : new String[] {"build_id", "device_tier", "variant", "client_group"}) {
+                            Object value = map.get(key);
+                            String text = value instanceof String ? (String) value : "<absent>";
+                            line.append(" ").append(key).append("=").append(text.isEmpty() ? "<empty>"
+                                    : text.substring(0, Math.min(96, text.length()))
+                                            .replace((char) 10, ' ').replace((char) 13, ' '));
+                        }
+                        Log.i(TAG, line.toString());
+                    }
+                } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                    Log.w(TAG, "V2 manifest observation failed; original request retained");
+                }
+                return chain.proceed();
+            });
+            Log.i(TAG, "V2 AICore manifest observer installed; no label/build ID overrides");
+        }
+    }
+
+    private void observeV2Backend(ClassLoader loader) {
+        try {
+            Method selector = new TargetMethod("oli", "b", "omd").resolve(loader);
+            AtomicInteger routeHits = new AtomicInteger();
+            hook(selector).intercept(chain -> {
+                Object result = chain.proceed();
+                if (routeHits.incrementAndGet() <= 8)
+                    Log.i(TAG, "V2 selected backend=" + enumName(result));
+                return result;
+            });
+            Method prepare = new TargetMethod("ojq", "l", "xin", "java.lang.String", "int").resolve(loader);
+            Method listener = new TargetMethod("xin", "b", "void",
+                    "java.lang.Runnable", "java.util.concurrent.Executor").resolve(loader);
+            java.util.Set<Object> observed = java.util.Collections.synchronizedSet(
+                    java.util.Collections.newSetFromMap(new java.util.WeakHashMap<Object, Boolean>()));
+            AtomicInteger prepares = new AtomicInteger();
+            hook(prepare).intercept(chain -> {
+                Object result = chain.proceed();
+                if (result instanceof java.util.concurrent.Future && observed.add(result)
+                        && prepares.incrementAndGet() <= 8) {
+                    int feature = (Integer) chain.getArgs().get(1);
+                    Log.i(TAG, "V2 AICore session requested; feature=" + feature);
+                    try {
+                        java.util.concurrent.Future<?> future = (java.util.concurrent.Future<?>) result;
+                        listener.invoke(result, (Runnable) () -> {
+                            // Never wait, consume/close a session, or alter the original future.
+                            if (!future.isDone()) return;
+                            try {
+                                future.get(0, java.util.concurrent.TimeUnit.MILLISECONDS);
+                                Log.i(TAG, "V2 AICore session prepared; feature=" + feature);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            } catch (Exception e) {
+                                Log.w(TAG, "V2 AICore session failed; feature=" + feature
+                                        + "; causes=" + errorTypes(e));
+                            }
+                        }, (java.util.concurrent.Executor) Runnable::run);
+                    } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                        Log.w(TAG, "V2 future observation unavailable; original future retained");
+                    }
+                }
+                return result;
+            });
+            Method build = new TargetMethod("omo", "a", "omq").resolve(loader);
+            Class<?> response = Class.forName("omq", false, loader);
+            java.lang.reflect.Field status = response.getDeclaredField("h");
+            java.lang.reflect.Field source = response.getDeclaredField("k");
+            if (!"omr".equals(status.getType().getName()) || !"omn".equals(source.getType().getName()))
+                throw new NoSuchFieldException("Response metadata types changed");
+            status.setAccessible(true);
+            source.setAccessible(true);
+            AtomicInteger responses = new AtomicInteger();
+            hook(build).intercept(chain -> {
+                Object result = chain.proceed();
+                if (responses.incrementAndGet() <= 24 && result != null) {
+                    try {
+                        Log.i(TAG, "V2 response built: source=" + enumName(source.get(result))
+                                + " status=" + enumName(status.get(result)));
+                    } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) { }
+                }
+                return result;
+            });
+            Log.i(TAG, "V2 route/session/response observers installed; no text logged");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            Log.w(TAG, "V2 backend diagnostics incomplete; original backend behavior retained", e);
+        }
+    }
+
+    private static String enumName(Object value) {
+        return value instanceof Enum<?> ? ((Enum<?>) value).name() : "<unknown>";
+    }
+
+    private static String errorTypes(Throwable error) {
+        StringBuilder line = new StringBuilder();
+        for (int i = 0; error != null && i < 6; i++) {
+            if (i != 0) line.append(" -> ");
+            line.append(error.getClass().getName());
+            // ele.b is the inspected Gboard AICore error code; no message or request text.
+            if ("ele".equals(error.getClass().getName())) {
+                try {
+                    java.lang.reflect.Field code = error.getClass().getDeclaredField("b");
+                    if (code.getType() == int.class) {
+                        code.setAccessible(true);
+                        line.append("(code=").append(code.getInt(error)).append(")");
+                    }
+                } catch (ReflectiveOperationException | RuntimeException ignored) { }
+            }
+            Throwable next = error.getCause();
+            if (next == error) break;
+            error = next;
+        }
+        return line.toString();
+    }
+
     private void initializeForGboard(ClassLoader loader, Context context) {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
         FeatureConfig.initialize(this);
@@ -70,11 +268,15 @@ public final class PixelBoardModule extends XposedModule {
         Log.i(TAG, "Gboard Application Context available; SDK " + Build.VERSION.SDK_INT
               + "; Rambler=" + FeatureConfig.rambler()
               + "; diagnostics=" + FeatureConfig.diagnostics());
+        verifiedV2 = verifiedWritingTools184 && resolveV2Profile(loader);
+        if (FeatureConfig.writingToolsV2() && !verifiedV2)
+            Log.w(TAG, "V2 requested but exact Gboard profile unsupported; basic cloud policy retained");
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
         if (FeatureConfig.writingTools()) {
             WritingToolsDiagnostics.probe(loader);
-            if (FeatureConfig.diagnostics() && verifiedWritingTools184)
+            if ((FeatureConfig.diagnostics() || FeatureConfig.writingToolsV2()) && verifiedWritingTools184)
                 observeWritingTools184State(loader);
+            if (FeatureConfig.writingToolsV2() && verifiedV2) observeV2Backend(loader);
         }
         RamblerBindings.Profile voiceProfile = null;
         if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) {
@@ -89,8 +291,12 @@ public final class PixelBoardModule extends XposedModule {
             if (flags != null) installFlagGetter(flags);
             else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
         }
-        if (FeatureConfig.writingTools())
-            Log.i(TAG, "Writing Tools policy=basic-cloud-v2; V2=false, backend=GBOARD_SERVER, hybrid=false, onDeviceProofread=false; overrides require resolved getter; UI/backend unverified");
+        if (FeatureConfig.writingTools()) {
+            boolean v2 = FeatureConfig.writingToolsV2() && verifiedV2;
+            Log.i(TAG, "Writing Tools policy=" + (v2 ? "v2-backends-experiment" : "basic-cloud-v2")
+                    + "; V2=" + v2 + "; requestedBackend=" + (v2 ? FeatureConfig.writingToolsBackend() : 1)
+                    + "; real provisioning/consent/account checks retained");
+        }
     }
 
     private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
@@ -161,7 +367,8 @@ public final class PixelBoardModule extends XposedModule {
                     // Use the Gboard-owned attach context, avoiding early ActivityThread nulls.
                     Object writingResult = "writing_tools_enable_stable_entrance".equals(flag)
                             && !verifiedWritingTools184 ? original
-                            : WritingToolsFlagPolicy.transform(flag, original, context);
+                            : WritingToolsFlagPolicy.overrideValue(flag, original, FeatureConfig.writingTools(),
+                                    verifiedV2 && FeatureConfig.writingToolsV2(), FeatureConfig.writingToolsBackend());
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.isToolbarFlag(flag)) {
                         int reads = writingToolbarReadCount.incrementAndGet();
                         if (reads <= 5)
@@ -204,7 +411,7 @@ public final class PixelBoardModule extends XposedModule {
                     throw new NoSuchFieldException("Unexpected signal type: " + names[i]);
                 fields[i].setAccessible(true);
             }
-            Method backend = new TargetMethod("qyn", "a", "qym").resolve(loader);
+            Method network = new TargetMethod("qyn", "a", "qym").resolve(loader);
             Method updater = new TargetMethod("hpz", "fM", "void",
                     "android.content.Context", "qad").resolve(loader);
             Method menu = new TargetMethod("hmp", "d", "void").resolve(loader);
@@ -219,10 +426,10 @@ public final class PixelBoardModule extends XposedModule {
                             for (int i = 0; i < fields.length; i++)
                                 line.append(" ").append(labels[i]).append("=")
                                         .append(signalRead.invoke(null, fields[i].get(null)));
-                            // The menu already reads this backend. Avoid initializing it in onCreate.
+                            // qyn is NetworkInfoNotification, not the inference backend.
                             if (target == menu) {
-                                Object value = backend.invoke(null);
-                                line.append(" backend=").append(value instanceof Enum<?>
+                                Object value = network.invoke(null);
+                                line.append(" network=").append(value instanceof Enum<?>
                                         ? ((Enum<?>) value).name() : "<unknown>");
                             }
                             Log.i(TAG, line.toString());

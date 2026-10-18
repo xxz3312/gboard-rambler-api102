@@ -2,6 +2,8 @@
     <uses-permission android:name="com.google.android.apps.aicore.service.BIND_SERVICE"/>
     <queries>
         <package android:name="com.google.android.aicore"/>
+        <package android:name="com.google.android.as.oss"/>
+        <package android:name="com.google.android.inputmethod.latin"/>
     </queries>
     <application android:name=".ModuleApp" android:label="Gboard Rambler API102"
         android:description="@string/module_description" android:allowBackup="false">

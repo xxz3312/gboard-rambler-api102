@@ -24,8 +24,8 @@ public final class WritingToolsFlagPolicy {
             "writing_helper",
             "enable_nga_lab_modeless_smartedit"
         )));
-    // Match the upstream default: basic cloud tools, with V2 disabled.
-    private static final Set<String> V2_DISABLED = Collections.unmodifiableSet(
+    // V2 is independently opt-in; the default remains the tested basic cloud policy.
+    private static final Set<String> V2_FLAGS = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
             "enable_writing_tools_v2",
             "enable_writing_tools_v2_on_toolbar",
@@ -44,7 +44,7 @@ public final class WritingToolsFlagPolicy {
             "writing_helper_supported_language_tags", "llm_pc_supported_language_tags"
         )));
     public static boolean targeted(String name) {
-        return name != null && (LEGACY.contains(name) || V2_DISABLED.contains(name)
+        return name != null && (LEGACY.contains(name) || V2_FLAGS.contains(name)
                 || LANGUAGE_FLAGS.contains(name)
                 || "writing_tools_enable_hybrid".equals(name)
                 || "enable_on_device_proofread".equals(name)
@@ -61,17 +61,24 @@ public final class WritingToolsFlagPolicy {
 
     // Pure typed policy, also exercised by host-side regression tests.
     static Object overrideValue(String name, Object original, boolean enabled) {
+        return overrideValue(name, original, enabled, false, 2);
+    }
+
+    static Object overrideValue(String name, Object original, boolean enabled,
+            boolean v2VerifiedAndEnabled, int requestedBackend) {
         if (!enabled || !targeted(name)) return original;
+        boolean v2 = v2VerifiedAndEnabled && (requestedBackend == 2 || requestedBackend == 3);
         if ("writing_tools_v2_backend_type".equals(name))
-            return original instanceof Long ? Long.valueOf(1L) : original;
+            return original instanceof Long ? Long.valueOf(v2 ? requestedBackend : 1L) : original;
         if (LANGUAGE_FLAGS.contains(name))
             return original instanceof String ? "*" : original;
         if ("nga_lab_modeless_smartedit_regex_version".equals(name))
             return original instanceof String && ((String) original).isEmpty() ? "v3" : original;
         if (!(original instanceof Boolean)) return original;
-        if (V2_DISABLED.contains(name) || "writing_tools_enable_hybrid".equals(name)
-                || "enable_on_device_proofread".equals(name))
-            return Boolean.FALSE;
+        if (V2_FLAGS.contains(name) || "writing_tools_enable_hybrid".equals(name))
+            return Boolean.valueOf(v2);
+        if ("enable_on_device_proofread".equals(name))
+            return Boolean.valueOf(v2 && requestedBackend == 2);
         if (LEGACY.contains(name) || "enable_writing_tools_voice_commands".equals(name))
             return Boolean.TRUE;
         return original;
