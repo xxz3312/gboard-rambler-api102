@@ -26,6 +26,36 @@ public final class RamblerFlagBindings {
         {"18.3.1", "acps", "g", "a"}
         // 18.0.3 nxw name-field binding remains unverified: don't assume nxw.a.
     };
+    /**
+     * Independent typed getter resolution for Writing Tools. Fail closed if more
+     * than one symbol family matches; never guess by obfuscated name alone.
+     */
+    public static Binding resolveUnique(ClassLoader loader) {
+        Binding found = null;
+        for (String[] candidate : CANDIDATES) {
+            Binding current = resolveSingle(loader, candidate);
+            if (current == null) continue;
+            if (found != null) return null;
+            found = current;
+        }
+        return found;
+    }
+    private static Binding resolveSingle(ClassLoader loader, String[] c) {
+        try {
+            Class<?> owner = Class.forName(c[1], false, loader);
+            Method getter = owner.getDeclaredMethod(c[2]);
+            Field name = owner.getDeclaredField(c[3]);
+            if (Modifier.isStatic(getter.getModifiers()) ||
+                Modifier.isStatic(name.getModifiers()) ||
+                getter.getReturnType() != Object.class ||
+                name.getType() != String.class) return null;
+            getter.setAccessible(true);
+            name.setAccessible(true);
+            return new Binding(c[0], c[1], getter, name);
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
+            return null;
+        }
+    }
     public static Binding resolve(ClassLoader loader, String profile) {
         Binding found = null;
         for (String[] c : CANDIDATES) {
