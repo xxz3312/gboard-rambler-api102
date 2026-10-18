@@ -83,3 +83,16 @@ No GitHub Actions build or release was triggered.
   not an acceptable substitute.
 - Source only, uncompiled, not verified. Prior notes describing non-Pixel V2
   as always stock are superseded by this opt-in server entry experiment.
+
+## Real-device finding (2026-10-18)
+- User reports Rambler still works, Writing Tools toolbar entry absent.
+- Gboard settings displays a disabled Writing Tools suggestion-strip switch.
+- Device log contained repeated `enable_writing_tools_v2 type=Boolean changed=true`,
+  but **no recorded toolbar-specific flag read**. A missing log line is not
+  conclusive proof the flag was never read (log filtering and timing matter).
+- As a narrow experiment, add upstream V2 suggested-instruction UI flags to
+  the server entry allowlist; leave AICore, My Style, consent, age, host and
+  eligibility checks unchanged.
+- Add a separate bounded log for `enable_writing_tools_v2_on_toolbar`
+  reading so it remains visible even when the general 40-line budget is spent.
+- Still no verified method-level toolbar creation Hook; don't claim activation.
