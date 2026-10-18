@@ -43,3 +43,13 @@ No GitHub Actions build or release was triggered.
 - The independent getter resolver runs even when the voice selector cannot be matched; it skips ambiguous symbol families.
 - The voice selector hooks are installed only for Rambler/diagnostics, never just because Writing Tools is switched on.
 - Signal gate and settings controller method signatures remain unknown; no speculative hooks added.
+
+## Signal identity diagnostic extension
+- `WritingToolsDiagnostics.probeSignals` inspects the declaring classes and
+  static field types for PixelBoard's `gvu#a`, `lvi#b`, and `gqd#a`.
+- It deliberately does **not** read the static field values (which could
+  initialize Gboard classes), mutate signal state, or install a signal-result hook.
+- Finding these descriptors alone does not establish the consumer method,
+  branch semantics, or Writing Tools toolbar eligibility.
+- The upstream 18.0.3 signal/resource identities must be revalidated for the
+  actual Gboard build before safely applying runtime result changes.
