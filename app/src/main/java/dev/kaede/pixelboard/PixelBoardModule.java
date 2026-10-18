@@ -54,14 +54,24 @@ public final class PixelBoardModule extends XposedModule {
               + "; diagnostics=" + FeatureConfig.diagnostics());
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
         if (FeatureConfig.writingTools()) WritingToolsDiagnostics.probe(loader);
-        if (FeatureConfig.rambler() || FeatureConfig.diagnostics() || FeatureConfig.writingTools()) installRambler(loader);
+        RamblerBindings.Profile voiceProfile = null;
+        if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) {
+            voiceProfile = RamblerBindings.select(loader);
+            if (voiceProfile != null) installRambler(loader, voiceProfile);
+            else Log.w(TAG, "No unique verified Rambler selector signatures; voice hooks skipped");
+        }
+        if (FeatureConfig.rambler() || FeatureConfig.writingTools()) {
+            RamblerFlagBindings.Binding flags = voiceProfile != null
+                    ? RamblerFlagBindings.resolve(loader, voiceProfile.id)
+                    : RamblerFlagBindings.resolveUnique(loader);
+            if (flags != null) installFlagGetter(flags);
+            else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
+        }
         if (FeatureConfig.writingTools())
-            Log.i(TAG, "Writing Tools flag policy enabled (runtime only; no DEX patch)");
+            Log.i(TAG, "Writing Tools runtime flag policy active; toolbar/backend unverified");
     }
 
-    private void installRambler(ClassLoader loader) {
-        RamblerBindings.Profile profile = RamblerBindings.select(loader);
-        if (profile == null) { Log.w(TAG, "No unique verified selector signatures; skipped"); return; }
+    private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
         Log.i(TAG, "Resolved selector signature family: " + profile.id);
         hookScope(profile.layout, loader, false);
         hookScope(profile.setup, loader, false);
@@ -69,7 +79,6 @@ public final class PixelBoardModule extends XposedModule {
         hookScope(profile.defaults, loader, true);
         observeSelectionRead(profile.read, loader);
         observeSelectionWrite(profile.write, loader);
-        if (FeatureConfig.rambler() || FeatureConfig.writingTools()) installFlagGetter(loader, profile.id);
     }
 
     private void hookScope(TargetMethod target, ClassLoader loader, boolean defaults) {
@@ -115,11 +124,7 @@ public final class PixelBoardModule extends XposedModule {
         }
     }
 
-    private void installFlagGetter(ClassLoader loader, String profile) {
-        RamblerFlagBindings.Binding binding = RamblerFlagBindings.resolve(loader, profile);
-        if (binding == null) {
-            Log.w(TAG, "No unique flag getter binding; leaving values intact"); return;
-        }
+    private void installFlagGetter(RamblerFlagBindings.Binding binding) {
         try {
             hook(binding.getter).intercept(chain -> {
                 Object original = chain.proceed();
@@ -138,7 +143,7 @@ public final class PixelBoardModule extends XposedModule {
                     return original;
                 }
             });
-            Log.i(TAG, "Installed guarded Rambler flag policy: " + binding.owner);
+            Log.i(TAG, "Installed shared guarded Rambler/WritingTools flag policy: " + binding.owner);
         } catch (RuntimeException | LinkageError e) {
             Log.w(TAG, "Flag getter hook skipped", e);
         }
