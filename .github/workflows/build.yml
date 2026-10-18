@@ -1,6 +1,8 @@
-name: Android CI (manual only)
+name: Android CI
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 jobs:
   debug:
     runs-on: ubuntu-latest
