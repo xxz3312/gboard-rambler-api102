@@ -272,3 +272,21 @@ Also observe callback onError(Throwable) for message-free cause classes.
 Version-bind live queries to the requesting app version, and invalidate stored
 query state when the explicit reload begins, preventing stale replies from being
 presented as the current query after an upgrade or process reload.
+
+## 0.1.16 backend initialization
+
+PCS/AICore previously relied only on Application.attach, unlike the existing
+late-context fallback for Gboard. Add package-checked currentApplication discovery
+and an Application.onCreate fallback. All backend paths share an atomic once guard;
+an unrelated package cannot consume it. Preserve Gboard/Rambler initialization.
+
+Emit BACKEND_PACKAGE before configuration work, report skipped preflight and
+initialization failures, and install the read-only proof observer independently
+of binding preflight (which can itself be affected by the backend caller's package
+visibility). Mutating overrides continue to require the existing preflight.
+
+Pin the current module version's latest PCS startup, mode, observer errors and proof
+metadata above the rolling event history. These are timestamped historical records
+with PIDs, not a claim that a backend process is currently alive.
+
+The explicit Root reload report now records before/after PIDs for each of the three targets, rather than only Gboard, so an exit code cannot conceal an unchanged PCS process.

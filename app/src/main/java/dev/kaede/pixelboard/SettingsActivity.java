@@ -163,9 +163,24 @@ public final class SettingsActivity extends Activity {
                 + (prefs.getInt("writing_tools_backend", 2) == 3
                         ? "\nAstrea READY 仅为前置开关检查；请以实际请求的 V2_RESPONSE / V2_ASTREA_ERROR 为准。" : "")
                 + "\n当前版本启动事件：\n" + (attached.isEmpty() ? "尚未收到。" : attached)
+                + "\n本版本最近 PCS 事件（按事件时间与 PID 判断）：\n" + backendEvents(version)
                 + "\nRoot 重载结果：\n" + runtimePrefs.getString("reload_result", "尚未执行。")
                 + "\n当前模块版本最近 40 条事件：\n"
                 + (history.isEmpty() ? "暂无。旧版历史不作为当前状态显示。" : history));
+    }
+
+
+    private String backendEvents(String version) {
+        String prefix = "last_v_" + version + "_com.google.android.as.oss_";
+        StringBuilder out = new StringBuilder();
+        for (String event : new String[] {"BACKEND_PACKAGE", "INIT_FAILED", "MODE",
+                "V2_DIAGNOSTICS_READY", "V2_DIAGNOSTICS_FAILED", "V2_PROFILE_FAILED",
+                "ASTREA_FLAG", "ASTREA_ATTESTATION"}) {
+            String line = runtimePrefs.getString(prefix + event, "");
+            if (!line.isEmpty()) out.append(line).append("\n");
+        }
+        return out.length() == 0 ? "尚未收到 PCS 事件；当前无法验证 PCS 观察器。"
+                : out.toString();
     }
 
     private void addToggle(LinearLayout parent, String key, String title, String note) {

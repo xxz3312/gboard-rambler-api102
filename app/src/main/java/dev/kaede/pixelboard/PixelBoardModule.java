@@ -17,6 +17,7 @@ public final class PixelBoardModule extends XposedModule {
     private static final String GBOARD = "com.google.android.inputmethod.latin";
 
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
+    private final BackendStartup backendStartup = new BackendStartup();
     private final java.util.Set<String> writingFlagsLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
     private volatile boolean verifiedWritingTools184;
@@ -100,31 +101,66 @@ public final class PixelBoardModule extends XposedModule {
     }
 
     private void prepareExperimentalBackend(String packageName, ClassLoader loader) {
-        if (loader == null) return;
+        if (loader == null) {
+            log(Log.WARN, TAG, "Backend package ready without classloader: " + packageName);
+            return;
+        }
+        log(Log.INFO, TAG, "Backend package ready: " + packageName + " module=" + BuildConfig.VERSION_NAME);
         try {
             hook(Application.class.getDeclaredMethod("attach", Context.class)).intercept(chain -> {
                 Object result = chain.proceed();
                 Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
-                if (arg instanceof Context && packageName.equals(((Context) arg).getPackageName())
-                        && bootstrapped.compareAndSet(false, true)) {
-                    FeatureConfig.initialize(this);
-                    recordStatus((Context) arg, "BACKEND_PACKAGE", "v2Requested="
-                            + FeatureConfig.writingToolsV2() + " backend=" + FeatureConfig.writingToolsBackend());
-                    WritingToolsBackendCheck.Result prerequisites = FeatureConfig.writingToolsV2()
-                            ? WritingToolsBackendCheck.check((Context) arg, FeatureConfig.writingToolsBackend()) : null;
-                    if (prerequisites != null && prerequisites.canAttempt) {
-                        try { installExperimentalBackend(packageName, loader, (Context) arg); }
-                        catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-                            Log.w(TAG, "V2 backend package hook skipped: " + packageName, e);
-                        }
-                    } else Log.i(TAG, "V2 backend process retained stock behavior; reason="
-                            + (prerequisites == null ? "V2_DISABLED" : prerequisites.code));
-                }
+                if (arg instanceof Context)
+                    initializeBackendOnce(packageName, loader, (Context) arg, "attach");
                 return result;
             });
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            Log.w(TAG, "V2 backend attach skipped", e);
+            log(Log.WARN, TAG, "Backend attach observer unavailable: " + e.getClass().getSimpleName());
         }
+        try {
+            hook(Application.class.getDeclaredMethod("onCreate")).intercept(chain -> {
+                Object result = chain.proceed();
+                Context context = GboardContext.current(packageName);
+                if (context != null) initializeBackendOnce(packageName, loader, context, "onCreate");
+                return result;
+            });
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            log(Log.WARN, TAG, "Backend onCreate observer unavailable: " + e.getClass().getSimpleName());
+        }
+        Context existing = GboardContext.current(packageName);
+        if (existing != null) initializeBackendOnce(packageName, loader, existing, "existing");
+    }
+
+    private void initializeBackendOnce(String packageName, ClassLoader loader, Context context, String source) {
+        backendStartup.start(packageName, context.getPackageName(), () -> {
+            recordStatus(context, "BACKEND_PACKAGE", "source=" + source
+                    + " process=" + Application.getProcessName());
+            try {
+                FeatureConfig.initialize(this);
+                boolean requested = FeatureConfig.writingToolsV2();
+                recordStatus(context, "MODE", "backendProcess=true v2Requested=" + requested
+                        + " backend=" + FeatureConfig.writingToolsBackend());
+                // Read-only observations must not depend on a package visibility/binding preflight.
+                if (requested && "com.google.android.as.oss".equals(packageName))
+                    observeAstreaAttestation(loader, context);
+                WritingToolsBackendCheck.Result prerequisites = requested
+                        ? WritingToolsBackendCheck.check(context, FeatureConfig.writingToolsBackend()) : null;
+                if (prerequisites != null && prerequisites.canAttempt) {
+                    try { installExperimentalBackend(packageName, loader, context); }
+                    catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                        recordStatus(context, "V2_DIAGNOSTICS_FAILED", "backend_install="
+                                + e.getClass().getSimpleName());
+                        Log.w(TAG, "V2 backend package hook skipped: " + packageName, e);
+                    }
+                } else {
+                    recordStatus(context, "MODE", "backendOverrides=stock reason="
+                            + (prerequisites == null ? "V2_DISABLED" : prerequisites.code));
+                }
+            } catch (RuntimeException | LinkageError e) {
+                recordStatus(context, "INIT_FAILED", "backend=" + e.getClass().getSimpleName());
+                Log.e(TAG, "Backend initialization failed: " + packageName, e);
+            }
+        });
     }
 
     private void installExperimentalBackend(String packageName, ClassLoader loader, Context context)
@@ -133,7 +169,6 @@ public final class PixelBoardModule extends XposedModule {
         try { pkg = context.getPackageManager().getPackageInfo(packageName, 0); }
         catch (android.content.pm.PackageManager.NameNotFoundException e) { return; }
         if ("com.google.android.as.oss".equals(packageName)) {
-            observeAstreaAttestation(loader, context);
             AstreaFlagResolver.Binding binding;
             try { binding = AstreaFlagResolver.resolve(context, loader); }
             catch (Exception | LinkageError e) {

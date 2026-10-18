@@ -10,12 +10,12 @@ public final class RuntimeReload {
         Process process = null;
         try {
             String script = "set -e\n"
-                    + "before=$(pidof com.google.android.inputmethod.latin || true)\n"
-                    + "am force-stop com.google.android.inputmethod.latin\n"
-                    + "am force-stop com.google.android.aicore\n"
-                    + "am force-stop com.google.android.as.oss\n"
-                    + "after=$(pidof com.google.android.inputmethod.latin || true)\n"
-                    + "printf 'before=%s\\nafter=%s\\n' \"$before\" \"$after\"\n";
+                    + "for target_package in com.google.android.inputmethod.latin com.google.android.aicore com.google.android.as.oss; do\n"
+                    + "  before=$(pidof \"$target_package\" || true)\n"
+                    + "  am force-stop \"$target_package\"\n"
+                    + "  after=$(pidof \"$target_package\" || true)\n"
+                    + "  printf '%s before=%s after=%s\\n' \"$target_package\" \"$before\" \"$after\"\n"
+                    + "done\n";
             process = new ProcessBuilder("su", "-c", script).redirectErrorStream(true).start();
             if (!process.waitFor(25, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
