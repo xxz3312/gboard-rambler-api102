@@ -66,3 +66,20 @@ No GitHub Actions build or release was triggered.
   actual installed Gboard version. Diagnostics now report unique getter resolution.
 - To port a settings-removal bypass or signal override, derive the concrete
   caller/target from a matching APK's method graph before installing a hook.
+
+## Server-backend entry experiment
+- On non-Pixel devices, enabling the separate Writing Tools switch now opts into
+  `writing_tools`, `writing_helper`, `config_proofread`, and three narrowly
+  scoped V2 entry flags (`enable_writing_tools_v2`,
+  `enable_writing_tools_v2_on_toolbar`, `writing_tools_v2`).
+- For the typed backend flag `writing_tools_v2_backend_type`, the experimental
+  policy requests upstream's server backend value `Long(1)`. This is **not**
+  proof of server entitlement or successful generation.
+- On-device AICore/My Style/suggest-style/consent/resource flags stay untouched.
+- The shared Hook logs at most 40 Writing Tools flag encounters per process,
+  recording names, value types and whether changed; it never logs typed text.
+- If the toolbar still does not appear, exact controller and eligibility callers
+  must be identified. Blindly forcing all signals or fabricating consent is
+  not an acceptable substitute.
+- Source only, uncompiled, not verified. Prior notes describing non-Pixel V2
+  as always stock are superseded by this opt-in server entry experiment.
