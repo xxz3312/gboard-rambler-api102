@@ -36,4 +36,10 @@ No GitHub Actions build or release was triggered.
 - Signal identities are `gvu#a`, `lvi#b`, `gqd#a`; the upstream code forces only these signal objects, not arbitrary signal results. No equivalent signal gate method signature has been verified in this project, so no signal Hook is installed.
 - Upstream official preference resource IDs are `0x7f1409e7`, `0x7f140b0f`, `0x7f140d0b` for its target APK. Resource IDs must not be assumed stable across stock versions; do not apply these constants blindly.
 - Upstream default preference seeding includes Writing Tools and screen context opt-in keys. This port deliberately does not synthesize user consent.
-- Current flag interception still uses the Rambler selector profile for the shared getter. The new diagnostics run independently; the Writing Tools getter is **not yet independently bound** when selector profile matching fails.
+- Current flag interception still uses the Rambler selector profile for the shared getter. The diagnostics and typed flag getter now resolve independently from the voice selector. If multiple candidates match, the resolver skips installation instead of guessing.
+
+## Runtime isolation update
+- A single typed flag getter hook now applies independent Rambler and Writing Tools policies.
+- The independent getter resolver runs even when the voice selector cannot be matched; it skips ambiguous symbol families.
+- The voice selector hooks are installed only for Rambler/diagnostics, never just because Writing Tools is switched on.
+- Signal gate and settings controller method signatures remain unknown; no speculative hooks added.
