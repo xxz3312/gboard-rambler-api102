@@ -30,6 +30,7 @@ public final class WritingToolsDiagnostics {
             }
         }
         probeSignals(loader);
+        probe1841ToolbarReference(loader);
         probeGetter(loader);
         Log.i(TAG, "WritingTools 18.0.3 probe: " + matched + "/" + targets.length
                 + " signatures found; no initialization/signal hooks installed");
@@ -41,6 +42,24 @@ public final class WritingToolsDiagnostics {
         } else {
             Log.i(TAG, "WritingTools getter: unique typed binding " + binding.profile
                     + " / " + binding.owner + " (method not invoked by probe)");
+        }
+    }
+
+    private static void probe1841ToolbarReference(ClassLoader loader) {
+        try {
+            Class<?> owner = Class.forName("plx", false, loader);
+            Field flag = owner.getDeclaredField("n");
+            if (!Modifier.isStatic(flag.getModifiers())
+                    || !"odr".equals(flag.getType().getName())) {
+                Log.w(TAG, "WritingTools 18.4.1 toolbar flag descriptor differs from APK");
+                return;
+            }
+            Method consumer = new TargetMethod("pmb", "n", "java.lang.String", "nsn")
+                    .resolve(loader);
+            Log.i(TAG, "WritingTools 18.4.1 toolbar flag plx#n (odr), "
+                    + "reader pmb#n(nsn):String verified; no hook installed");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            Log.i(TAG, "WritingTools 18.4.1 toolbar reader descriptor not found");
         }
     }
 
