@@ -107,7 +107,7 @@ public final class AiCoreProbeActivity extends Activity {
     }
 
     private String deviceReport() {
-        StringBuilder text = new StringBuilder("版本：0.1.5-aicore-labels\n");
+        StringBuilder text = new StringBuilder("版本：0.1.6-build22347-test\n");
         text.append("设备：").append(Build.MANUFACTURER).append(" ")
                 .append(Build.MODEL).append(" / ").append(Build.DEVICE)
                 .append("\nAndroid API：").append(Build.VERSION.SDK_INT).append("\n");

@@ -100,6 +100,21 @@ public final class PixelBoardModule extends XposedModule {
             Log.w(TAG, "AICore unsupported version; diagnostics skipped");
             return;
         }
+        // Controlled experiment: value read from this user's real DeviceConfig.
+        // Keep empty device tier and variant unchanged so only build ID differs.
+        if ("2509FPN0BC".equals(Build.MODEL) && "popsicle".equals(Build.DEVICE)) {
+            Method buildId = new TargetMethod("gif", "g", "java.lang.Integer").resolve(loader);
+            AtomicBoolean buildLogged = new AtomicBoolean(false);
+            hook(buildId).intercept(chain -> {
+                Object original = chain.proceed();
+                if (buildLogged.compareAndSet(false, true))
+                    Log.i(TAG, "AICore build ID experiment: original=" + original + " effective=22347");
+                return Integer.valueOf(22347);
+            });
+            Log.i(TAG, "AICore Xiaomi build22347 experiment installed");
+        } else {
+            Log.w(TAG, "AICore build ID experiment skipped: device does not match");
+        }
         Method clientName = new TargetMethod("isz", "a", "java.lang.String").resolve(loader);
         Method fetch = new TargetMethod("ity", "a", "java.lang.Object",
                 "isz", "java.util.Map", "nrj").resolve(loader);
@@ -137,7 +152,7 @@ public final class PixelBoardModule extends XposedModule {
             }
             return chain.proceed();
         });
-        Log.i(TAG, "AICore 526928 manifest diagnostics installed; no request overrides");
+        Log.i(TAG, "AICore 526928 manifest diagnostics installed; see build ID experiment status");
     }
 
     /** Only the supplied PCS 116015 APK has been inspected. Unknown versions stay stock. */
