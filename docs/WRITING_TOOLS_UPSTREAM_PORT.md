@@ -94,3 +94,5 @@ Consequences:
   arguments/return type/feature eligibility and could damage keyboard.
 - The earlier 18.0.3 signal candidate `lvi#b` was invalid; the direct
   18.4.1 toolbar flag xref is a more reliable path.
+
+Further parsed exact DEX descriptors: `Lplx;->n:Lodr;` and `Lpmb;->n(Lnsn;)Ljava/lang/String;`. Thus `pmb.n` is **not a Boolean availability gate**, despite reading the toolbar flag; it may use the flag in string-producing logic. Added read-only, exact signature check and will not force its return value.
