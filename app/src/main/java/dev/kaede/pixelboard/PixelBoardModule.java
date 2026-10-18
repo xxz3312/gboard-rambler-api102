@@ -11,7 +11,7 @@ import java.lang.reflect.Method;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam;
 
-/** Gboard-only modern LSPosed entry; fail-closed reflection and disabled feature switches. */
+/** Modern LSPosed entry with separately scoped Gboard and version-guarded Astrea hooks. */
 public final class PixelBoardModule extends XposedModule {
     private static final String TAG = "PixelBoardLS";
     private static final String GBOARD = "com.google.android.inputmethod.latin";
@@ -27,6 +27,10 @@ public final class PixelBoardModule extends XposedModule {
     }
 
     @Override public void onPackageReady(PackageReadyParam param) {
+        if ("com.google.android.as.oss".equals(param.getPackageName())) {
+            prepareAstrea(param.getClassLoader());
+            return;
+        }
         if (!GBOARD.equals(param.getPackageName())) return;
         ClassLoader loader = param.getClassLoader();
         if (loader == null) { Log.w(TAG, "No Gboard classloader"); return; }
@@ -51,6 +55,59 @@ public final class PixelBoardModule extends XposedModule {
         } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
             Log.e(TAG, "Application.attach hook installation failed", ex);
         }
+    }
+
+
+    /** Only the supplied PCS 116015 APK has been inspected. Unknown versions stay stock. */
+    private void prepareAstrea(ClassLoader loader) {
+        if (loader == null) return;
+        try {
+            Method attach = Application.class.getDeclaredMethod("attach", Context.class);
+            hook(attach).intercept(chain -> {
+                Object result = chain.proceed();
+                Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
+                if (arg instanceof Context && bootstrapped.compareAndSet(false, true)) {
+                    Context context = (Context) arg;
+                    if ("com.google.android.as.oss".equals(context.getPackageName())) {
+                        try { installAstrea(loader, context); }
+                        catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                            Log.e(TAG, "Astrea protected download hook skipped", e);
+                        }
+                    }
+                }
+                return result;
+            });
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            Log.e(TAG, "Astrea attach hook skipped", e);
+        }
+    }
+
+    private void installAstrea(ClassLoader loader, Context context)
+            throws ReflectiveOperationException {
+        PackageInfo pkg;
+        try { pkg = context.getPackageManager().getPackageInfo("com.google.android.as.oss", 0); }
+        catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "Astrea version unavailable", e);
+            return;
+        }
+        if (pkg.getLongVersionCode() != 116015L
+                || !"1.0.release.825068975".equals(pkg.versionName)) {
+            Log.w(TAG, "Astrea unsupported version; stock behavior retained: " + pkg.versionName);
+            return;
+        }
+        Method getter = new TargetMethod("efh", "g", "java.lang.String", "java.lang.String")
+                .resolve(loader);
+        AtomicBoolean logged = new AtomicBoolean(false);
+        hook(getter).intercept(chain -> {
+            if (chain.getArgs().size() == 1
+                    && "ProtectedDownload__enabled".equals(chain.getArgs().get(0))) {
+                if (logged.compareAndSet(false, true))
+                    Log.i(TAG, "Astrea ProtectedDownload__enabled override applied");
+                return "true";
+            }
+            return chain.proceed();
+        });
+        Log.i(TAG, "Astrea 116015 protected download flag hook installed");
     }
 
     private void initializeForGboard(ClassLoader loader, Context context) {

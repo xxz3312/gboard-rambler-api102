@@ -107,7 +107,7 @@ public final class AiCoreProbeActivity extends Activity {
     }
 
     private String deviceReport() {
-        StringBuilder text = new StringBuilder("版本：0.1.3-aicore-bind\n");
+        StringBuilder text = new StringBuilder("版本：0.1.4-astrea-config\n");
         text.append("设备：").append(Build.MANUFACTURER).append(" ")
                 .append(Build.MODEL).append(" / ").append(Build.DEVICE)
                 .append("\nAndroid API：").append(Build.VERSION.SDK_INT).append("\n");
