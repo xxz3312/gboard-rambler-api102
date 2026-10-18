@@ -11,7 +11,7 @@ import java.lang.reflect.Method;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam;
 
-/** Modern LSPosed entry with separately scoped Gboard and version-guarded Astrea hooks. */
+/** Modern LSPosed entry scoped to Gboard; local-model experiments are inactive. */
 public final class PixelBoardModule extends XposedModule {
     private static final String TAG = "PixelBoardLS";
     private static final String GBOARD = "com.google.android.inputmethod.latin";
@@ -19,7 +19,7 @@ public final class PixelBoardModule extends XposedModule {
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
     private final java.util.Set<String> writingFlagsLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
-    private final AtomicInteger toolbarConsumerLogCount = new AtomicInteger(0);
+    private volatile boolean verifiedWritingTools184;
     private volatile Context hostContext;
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
@@ -27,14 +27,6 @@ public final class PixelBoardModule extends XposedModule {
     }
 
     @Override public void onPackageReady(PackageReadyParam param) {
-        if ("com.google.android.aicore".equals(param.getPackageName())) {
-            prepareAicoreDiagnostics(param.getClassLoader());
-            return;
-        }
-        if ("com.google.android.as.oss".equals(param.getPackageName())) {
-            prepareAstrea(param.getClassLoader());
-            return;
-        }
         if (!GBOARD.equals(param.getPackageName())) return;
         ClassLoader loader = param.getClassLoader();
         if (loader == null) { Log.w(TAG, "No Gboard classloader"); return; }
@@ -63,155 +55,13 @@ public final class PixelBoardModule extends XposedModule {
 
 
 
-    /** Observe only the inspected AICore version and the manifest client under investigation. */
-    private void prepareAicoreDiagnostics(ClassLoader loader) {
-        if (loader == null) return;
-        try {
-            Method attach = Application.class.getDeclaredMethod("attach", Context.class);
-            hook(attach).intercept(chain -> {
-                Object result = chain.proceed();
-                Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
-                if (arg instanceof Context && bootstrapped.compareAndSet(false, true)) {
-                    Context context = (Context) arg;
-                    if ("com.google.android.aicore".equals(context.getPackageName())) {
-                        try { installAicoreDiagnostics(loader, context); }
-                        catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-                            Log.e(TAG, "AICore manifest diagnostics skipped", e);
-                        }
-                    }
-                }
-                return result;
-            });
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            Log.e(TAG, "AICore diagnostic attach hook skipped", e);
-        }
-    }
-
-    private void installAicoreDiagnostics(ClassLoader loader, Context context)
-            throws ReflectiveOperationException {
-        PackageInfo pkg;
-        try { pkg = context.getPackageManager().getPackageInfo("com.google.android.aicore", 0); }
-        catch (android.content.pm.PackageManager.NameNotFoundException e) {
-            Log.w(TAG, "AICore version unavailable", e);
-            return;
-        }
-        if (pkg.getLongVersionCode() != 526928L
-                || !"0.release.qc8635.prod_aicore_20260917.00_RC01".equals(pkg.versionName)) {
-            Log.w(TAG, "AICore unsupported version; diagnostics skipped");
-            return;
-        }
-        // Controlled experiment: value read from this user's real DeviceConfig.
-        // Keep empty device tier and variant unchanged so only build ID differs.
-        if ("2509FPN0BC".equals(Build.MODEL) && "popsicle".equals(Build.DEVICE)) {
-            Method buildId = new TargetMethod("gif", "g", "java.lang.Integer").resolve(loader);
-            AtomicBoolean buildLogged = new AtomicBoolean(false);
-            hook(buildId).intercept(chain -> {
-                Object original = chain.proceed();
-                if (buildLogged.compareAndSet(false, true))
-                    Log.i(TAG, "AICore build ID experiment: original=" + original + " effective=22347");
-                return Integer.valueOf(22347);
-            });
-            Log.i(TAG, "AICore Xiaomi build22347 experiment installed");
-        } else {
-            Log.w(TAG, "AICore build ID experiment skipped: device does not match");
-        }
-        Method clientName = new TargetMethod("isz", "a", "java.lang.String").resolve(loader);
-        Method fetch = new TargetMethod("ity", "a", "java.lang.Object",
-                "isz", "java.util.Map", "nrj").resolve(loader);
-        AtomicInteger hits = new AtomicInteger(0);
-        hook(fetch).intercept(chain -> {
-            // Diagnostic failures must never change or suppress the original request.
-            try {
-                if (chain.getArgs().size() == 3) {
-                    Object client = chain.getArgs().get(0);
-                    Object labels = chain.getArgs().get(1);
-                    if (client != null && labels instanceof java.util.Map
-                            && "com.google.android.aicore:18103149225492435673"
-                                    .equals(clientName.invoke(client))
-                            && hits.incrementAndGet() <= 6) {
-                        java.util.Map<?, ?> map = (java.util.Map<?, ?>) labels;
-                        StringBuilder line = new StringBuilder("AICore manifest labels:");
-                        for (String key : new String[] {
-                                "build_id", "device_tier", "variant", "client_group"}) {
-                            Object value = map.get(key);
-                            line.append(" ").append(key).append("=");
-                            if (!map.containsKey(key)) line.append("<absent>");
-                            else if (value == null) line.append("<null>");
-                            else if (value instanceof String) {
-                                String text = (String) value;
-                                if (text.isEmpty()) line.append("<empty>");
-                                else line.append(text.substring(0, Math.min(96, text.length()))
-                                        .replace((char) 10, ' ').replace((char) 13, ' '));
-                            } else line.append("<unexpected-type>");
-                        }
-                        Log.i(TAG, line.toString());
-                    }
-                }
-            } catch (ReflectiveOperationException | RuntimeException e) {
-                Log.w(TAG, "AICore label observation failed; original request retained", e);
-            }
-            return chain.proceed();
-        });
-        Log.i(TAG, "AICore 526928 manifest diagnostics installed; see build ID experiment status");
-    }
-
-    /** Only the supplied PCS 116015 APK has been inspected. Unknown versions stay stock. */
-    private void prepareAstrea(ClassLoader loader) {
-        if (loader == null) return;
-        try {
-            Method attach = Application.class.getDeclaredMethod("attach", Context.class);
-            hook(attach).intercept(chain -> {
-                Object result = chain.proceed();
-                Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
-                if (arg instanceof Context && bootstrapped.compareAndSet(false, true)) {
-                    Context context = (Context) arg;
-                    if ("com.google.android.as.oss".equals(context.getPackageName())) {
-                        try { installAstrea(loader, context); }
-                        catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-                            Log.e(TAG, "Astrea protected download hook skipped", e);
-                        }
-                    }
-                }
-                return result;
-            });
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            Log.e(TAG, "Astrea attach hook skipped", e);
-        }
-    }
-
-    private void installAstrea(ClassLoader loader, Context context)
-            throws ReflectiveOperationException {
-        PackageInfo pkg;
-        try { pkg = context.getPackageManager().getPackageInfo("com.google.android.as.oss", 0); }
-        catch (android.content.pm.PackageManager.NameNotFoundException e) {
-            Log.w(TAG, "Astrea version unavailable", e);
-            return;
-        }
-        if (pkg.getLongVersionCode() != 116015L
-                || !"1.0.release.825068975".equals(pkg.versionName)) {
-            Log.w(TAG, "Astrea unsupported version; stock behavior retained: " + pkg.versionName);
-            return;
-        }
-        Method getter = new TargetMethod("efh", "g", "java.lang.String", "java.lang.String")
-                .resolve(loader);
-        AtomicBoolean logged = new AtomicBoolean(false);
-        hook(getter).intercept(chain -> {
-            if (chain.getArgs().size() == 1
-                    && "ProtectedDownload__enabled".equals(chain.getArgs().get(0))) {
-                if (logged.compareAndSet(false, true))
-                    Log.i(TAG, "Astrea ProtectedDownload__enabled override applied");
-                return "true";
-            }
-            return chain.proceed();
-        });
-        Log.i(TAG, "Astrea 116015 protected download flag hook installed");
-    }
-
     private void initializeForGboard(ClassLoader loader, Context context) {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
         FeatureConfig.initialize(this);
         try {
             PackageInfo pkg = context.getPackageManager().getPackageInfo(GBOARD, 0);
+            verifiedWritingTools184 = pkg.getLongVersionCode() == 176027078L
+                    && "18.4.1.985164140-release-arm64-v8a".equals(pkg.versionName);
             Log.i(TAG, "Target Gboard version=" + pkg.versionName
                     + ", versionCode=" + pkg.getLongVersionCode());
         } catch (android.content.pm.PackageManager.NameNotFoundException e) {
@@ -223,7 +73,8 @@ public final class PixelBoardModule extends XposedModule {
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
         if (FeatureConfig.writingTools()) {
             WritingToolsDiagnostics.probe(loader);
-            observeWritingToolsToolbarConsumer(loader);
+            if (FeatureConfig.diagnostics() && verifiedWritingTools184)
+                observeWritingTools184State(loader);
         }
         RamblerBindings.Profile voiceProfile = null;
         if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) {
@@ -239,7 +90,7 @@ public final class PixelBoardModule extends XposedModule {
             else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
         }
         if (FeatureConfig.writingTools())
-            Log.i(TAG, "Writing Tools policy=basic-cloud-v1; V2=false, backend=GBOARD_SERVER, hybrid=false, onDeviceProofread=false; overrides require resolved getter; UI/backend unverified");
+            Log.i(TAG, "Writing Tools policy=basic-cloud-v2; V2=false, backend=GBOARD_SERVER, hybrid=false, onDeviceProofread=false; overrides require resolved getter; UI/backend unverified");
     }
 
     private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
@@ -308,7 +159,9 @@ public final class PixelBoardModule extends XposedModule {
                     if (context == null || !GBOARD.equals(context.getPackageName()))
                         return original;
                     // Use the Gboard-owned attach context, avoiding early ActivityThread nulls.
-                    Object writingResult = WritingToolsFlagPolicy.transform(flag, original, context);
+                    Object writingResult = "writing_tools_enable_stable_entrance".equals(flag)
+                            && !verifiedWritingTools184 ? original
+                            : WritingToolsFlagPolicy.transform(flag, original, context);
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.isToolbarFlag(flag)) {
                         int reads = writingToolbarReadCount.incrementAndGet();
                         if (reads <= 5)
@@ -334,25 +187,55 @@ public final class PixelBoardModule extends XposedModule {
         }
     }
 
-    /**
-     * Gboard 18.4.1 APK: pmb#n(nsn):String reads plx#n, the V2 toolbar flag.
-     * This is an OBSERVER only: never logs user text, arguments or return data.
-     */
-    private void observeWritingToolsToolbarConsumer(ClassLoader loader) {
+    /** Exact 18.4 mapping. Read signals after stock callbacks; never alter eligibility. */
+    private void observeWritingTools184State(ClassLoader loader) {
         try {
-            Method method = new TargetMethod("pmb", "n", "java.lang.String", "nsn")
-                    .resolve(loader);
-            hook(method).intercept(chain -> {
-                Object result = chain.proceed();
-                int hit = toolbarConsumerLogCount.incrementAndGet();
-                if (hit <= 8)
-                    Log.i(TAG, "WritingTools 18.4.1 pmb#n toolbar flag consumer invoked #"
-                            + hit + ", returnedNull=" + (result == null));
-                return result;
-            });
-            Log.i(TAG, "WritingTools 18.4.1 pmb#n passive observer installed");
+            Method signalRead = new TargetMethod("qeq", "e", "boolean", "qem").resolve(loader);
+            Class<?> signals = Class.forName("qrr", false, loader);
+            java.lang.reflect.Field[] fields = new java.lang.reflect.Field[5];
+            String[] names = {"c", "d", "g", "h", "i"};
+            String[] labels = {"proofreadProvisioned", "proofreadReady", "handlerProvisioned",
+                    "handlerEverProvisioned", "handlerReady"};
+            Class<?> signalType = Class.forName("qem", false, loader);
+            for (int i = 0; i < fields.length; i++) {
+                fields[i] = signals.getDeclaredField(names[i]);
+                if (fields[i].getType() != signalType
+                        || !java.lang.reflect.Modifier.isStatic(fields[i].getModifiers()))
+                    throw new NoSuchFieldException("Unexpected signal type: " + names[i]);
+                fields[i].setAccessible(true);
+            }
+            Method backend = new TargetMethod("qyn", "a", "qym").resolve(loader);
+            Method updater = new TargetMethod("hpz", "fM", "void",
+                    "android.content.Context", "qad").resolve(loader);
+            Method menu = new TargetMethod("hmp", "d", "void").resolve(loader);
+            AtomicInteger hits = new AtomicInteger();
+            for (Method target : new Method[] {updater, menu}) {
+                hook(target).intercept(chain -> {
+                    Object result = chain.proceed();
+                    if (hits.incrementAndGet() <= 12) {
+                        try {
+                            StringBuilder line = new StringBuilder("WritingTools 18.4 state after ")
+                                    .append(target.getDeclaringClass().getSimpleName());
+                            for (int i = 0; i < fields.length; i++)
+                                line.append(" ").append(labels[i]).append("=")
+                                        .append(signalRead.invoke(null, fields[i].get(null)));
+                            // The menu already reads this backend. Avoid initializing it in onCreate.
+                            if (target == menu) {
+                                Object value = backend.invoke(null);
+                                line.append(" backend=").append(value instanceof Enum<?>
+                                        ? ((Enum<?>) value).name() : "<unknown>");
+                            }
+                            Log.i(TAG, line.toString());
+                        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                            Log.w(TAG, "WritingTools state observation skipped", e);
+                        }
+                    }
+                    return result;
+                });
+            }
+            Log.i(TAG, "WritingTools 18.4 state observers installed; no signal overrides");
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            Log.w(TAG, "WritingTools 18.4.1 pmb#n observer not installed", e);
+            Log.w(TAG, "WritingTools 18.4 state observers not installed", e);
         }
     }
 

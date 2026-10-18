@@ -5,7 +5,7 @@ import static org.junit.Assert.*;
 
 public final class WritingToolsFlagPolicyTest {
     private static final String[] BASIC = {
-        "config_proofread", "writing_tools", "enable_writing_tools_cooperative_mode",
+        "config_proofread", "writing_tools", "writing_tools_enable_stable_entrance", "enable_writing_tools_cooperative_mode",
         "writing_helper_on_selected_text", "writing_helper_enable_text_stylization_internal",
         "writing_helper", "enable_nga_lab_modeless_smartedit", "enable_writing_tools_voice_commands"
     };

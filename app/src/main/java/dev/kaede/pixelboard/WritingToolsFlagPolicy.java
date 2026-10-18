@@ -17,6 +17,7 @@ public final class WritingToolsFlagPolicy {
         new HashSet<>(Arrays.asList(
             "config_proofread",
             "writing_tools",
+            "writing_tools_enable_stable_entrance",
             "enable_writing_tools_cooperative_mode",
             "writing_helper_on_selected_text",
             "writing_helper_enable_text_stylization_internal",

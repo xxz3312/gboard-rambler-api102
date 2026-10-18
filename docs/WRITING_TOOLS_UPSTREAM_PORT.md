@@ -1,7 +1,7 @@
 # PixelBoard-equivalent Writing Tools port
 
 Branch: `writing-tools-upstream-port`. This is a staging branch, separate from
-the currently working Rambler module. No APK compiled/released from this branch.
+the stable Rambler branch. Debug builds exist; cloud Writing Tools remains unverified.
 
 ## Root cause of earlier attempt
 
@@ -43,13 +43,7 @@ flags or blindly intercepting the outer method return.
 - Only build a Debug APK after target descriptors are verified; run Rambler
   regression checks before considering a Release.
 
-## Needed for exact adaptation
-
-A copy of the exact installed Gboard base APK (and split APKs if the installation
-uses splits), or an equivalent complete class/method dump from that same build.
-A settings screenshot alone does not reveal the obfuscated internal entry methods.
-
-Upstream file paths:
+## Adaptation source\n\nThe exact supplied Gboard 18.4.1 APK has now been inspected.\n\nUpstream file paths:
 - `pixelboard-patches/patches/src/main/kotlin/com/akshaykadam/pixelboard/patches/gboard/registry/GboardPatchRegistry.kt`
 - `pixelboard-patches/patches/src/main/kotlin/com/akshaykadam/pixelboard/patches/gboard/features/writingtools/GboardAiWritingToolsFlagValuePatch.kt`
 - `pixelboard-patches/extensions/extension/src/main/java/com/akshaykadam/pixelboard/extension/writingtools/GboardAiWritingToolsRuntime.java`
@@ -83,33 +77,12 @@ Consequences:
 - No verified UI-controller bypass or equivalent AutoFix instruction-level
   hook has yet been established.
 
-## 18.4.1 direct DEX instruction cross-reference (confirmed)
-- `enable_writing_tools_v2_on_toolbar` is constructed in
-  `Lplx;-><clinit>()V` and stored in static field `Lplx;->n`.
-- `Lpmb;->n` reads `Lplx;->n` (confirmed DEX `sget` reference).
-- The named field is not itself a Boolean: it is a typed flag object.
-  The value computation and disabled-state/UI construction still require
-  method-level control-flow inspection, including `Lpmb;->n` and callers.
-- **Do not hook `Lpmb;->n` to unconditional true:** this would ignore
-  arguments/return type/feature eligibility and could damage keyboard.
-- The earlier 18.0.3 signal candidate `lvi#b` was invalid; the direct
-  18.4.1 toolbar flag xref is a more reliable path.
+## Corrected instruction analysis
 
-Further parsed exact DEX descriptors: `Lplx;->n:Lodr;` and `Lpmb;->n(Lnsn;)Ljava/lang/String;`. Thus `pmb.n` is **not a Boolean availability gate**, despite reading the toolbar flag; it may use the flag in string-producing logic. Added read-only, exact signature check and will not force its return value.
+The earlier raw scan incorrectly identified pmb.n as a consumer of plx.n.
+Decoded instructions show pmb.n(nsn):String selects plx.a or plx.b.
+The previous passive observer has been removed. No toolbar role is established
+for this method.
 
-## 18.4.1 passive toolbar-consumer observation
-
-Installed an opt-in, read-only API 102 interceptor for verified
-`Lpmb;->n(Lnsn;)Ljava/lang/String;` on the staging branch.
-It calls `chain.proceed()` and returns the original result unchanged,
-logging only bounded invocation counts and whether the result was null.
-It never logs text, arguments, or returned strings.
-
-An observed invocation will establish that the method is active in the
-user's runtime, **not** that it is a UI eligibility/visibility gate.
-The existing APK signature maps it to a string-producing consumer of
-`Lplx;->n:Lodr;`. No value/eligibility force is performed.
-
-The short supplied log from 2026-10-18 only contained repeated
-`enable_writing_tools_v2` observations; it did not show toolbar gate
-reads. It predates this observer and cannot prove non-execution.
+See [0.1.7 cloud entry test](BASIC_CLOUD_TEST.md) for verified hpz/hmp/qrr
+mappings, the exact-version stable-entry change, and remaining limitations.
