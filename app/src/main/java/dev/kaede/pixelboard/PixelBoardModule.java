@@ -26,6 +26,7 @@ public final class PixelBoardModule extends XposedModule {
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
         Log.i(TAG, "PixelBoard API102 entry loaded");
+        log(Log.INFO, TAG, "PixelBoard API102 entry loaded; module=" + BuildConfig.VERSION_NAME);
     }
 
     @Override public void onPackageReady(PackageReadyParam param) {
@@ -38,6 +39,7 @@ public final class PixelBoardModule extends XposedModule {
         ClassLoader loader = param.getClassLoader();
         if (loader == null) { Log.w(TAG, "No Gboard classloader"); return; }
         Log.i(TAG, "Gboard package ready; waiting for Application.attach");
+        log(Log.INFO, TAG, "Gboard package ready; attach initialization armed");
         try {
             Method attach = Application.class.getDeclaredMethod("attach", Context.class);
             hook(attach).intercept(chain -> {
@@ -47,7 +49,10 @@ public final class PixelBoardModule extends XposedModule {
                     Context appContext = (Context) arg;
                     if (GBOARD.equals(appContext.getPackageName())) {
                         try { initializeForGboard(loader, appContext); }
-                        catch (Throwable ex) { Log.e(TAG, "Gboard post-attach initialization failed", ex); }
+                        catch (Throwable ex) {
+                            recordStatus(appContext, "INIT_FAILED", ex.getClass().getName());
+                            Log.e(TAG, "Gboard post-attach initialization failed", ex);
+                        }
                     } else {
                         bootstrapped.set(false);
                     }
@@ -55,6 +60,16 @@ public final class PixelBoardModule extends XposedModule {
                 return result;
             });
             Log.i(TAG, "Application.attach hook installed");
+            // PackageReady can also run after an application already exists. Use the same
+            // once-only initialization guard instead of waiting for a missed attach callback.
+            Context existing = GboardContext.current();
+            if (existing != null && bootstrapped.compareAndSet(false, true)) {
+                try { initializeForGboard(loader, existing); }
+                catch (Throwable ex) {
+                    recordStatus(existing, "INIT_FAILED", ex.getClass().getName());
+                    Log.e(TAG, "Gboard existing-context initialization failed", ex);
+                }
+            }
         } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
             Log.e(TAG, "Application.attach hook installation failed", ex);
         }
@@ -62,6 +77,13 @@ public final class PixelBoardModule extends XposedModule {
 
 
 
+
+
+    private void recordStatus(Context context, String event, String detail) {
+        RuntimeStatus.send(context, event, detail);
+        try { log(Log.INFO, TAG, event + " " + RuntimeStatusFormat.metadata(detail)); }
+        catch (RuntimeException | LinkageError ignored) { }
+    }
 
     private boolean resolveV2Profile(ClassLoader loader) {
         try {
@@ -86,6 +108,8 @@ public final class PixelBoardModule extends XposedModule {
                 if (arg instanceof Context && packageName.equals(((Context) arg).getPackageName())
                         && bootstrapped.compareAndSet(false, true)) {
                     FeatureConfig.initialize(this);
+                    recordStatus((Context) arg, "BACKEND_PACKAGE", "v2Requested="
+                            + FeatureConfig.writingToolsV2() + " backend=" + FeatureConfig.writingToolsBackend());
                     WritingToolsBackendCheck.Result prerequisites = FeatureConfig.writingToolsV2()
                             ? WritingToolsBackendCheck.check((Context) arg, FeatureConfig.writingToolsBackend()) : null;
                     if (prerequisites != null && prerequisites.canAttempt) {
@@ -119,8 +143,10 @@ public final class PixelBoardModule extends XposedModule {
             hook(flag).intercept(chain -> {
                 if (chain.getArgs().size() == 1
                         && "ProtectedDownload__enabled".equals(chain.getArgs().get(0))) {
-                    if (logged.compareAndSet(false, true))
+                    if (logged.compareAndSet(false, true)) {
                         Log.i(TAG, "V2 Astrea protected download flag applied; request acceptance unverified");
+                        recordStatus(context, "ASTREA_FLAG", "ProtectedDownload__enabled=true");
+                    }
                     return "true";
                 }
                 return chain.proceed();
@@ -153,6 +179,7 @@ public final class PixelBoardModule extends XposedModule {
                                             .replace((char) 10, ' ').replace((char) 13, ' '));
                         }
                         Log.i(TAG, line.toString());
+                        recordStatus(context, "MANIFEST_REQUEST", line.toString());
                     }
                 } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
                     Log.w(TAG, "V2 manifest observation failed; original request retained");
@@ -169,8 +196,10 @@ public final class PixelBoardModule extends XposedModule {
             AtomicInteger routeHits = new AtomicInteger();
             hook(selector).intercept(chain -> {
                 Object result = chain.proceed();
-                if (routeHits.incrementAndGet() <= 8)
+                if (routeHits.incrementAndGet() <= 8) {
                     Log.i(TAG, "V2 selected backend=" + enumName(result));
+                    recordStatus(hostContext, "V2_ROUTE", enumName(result));
+                }
                 return result;
             });
             Method prepare = new TargetMethod("ojq", "l", "xin", "java.lang.String", "int").resolve(loader);
@@ -185,6 +214,7 @@ public final class PixelBoardModule extends XposedModule {
                         && prepares.incrementAndGet() <= 8) {
                     int feature = (Integer) chain.getArgs().get(1);
                     Log.i(TAG, "V2 AICore session requested; feature=" + feature);
+                    recordStatus(hostContext, "V2_SESSION_REQUEST", "feature=" + feature);
                     try {
                         java.util.concurrent.Future<?> future = (java.util.concurrent.Future<?>) result;
                         listener.invoke(result, (Runnable) () -> {
@@ -193,9 +223,11 @@ public final class PixelBoardModule extends XposedModule {
                             try {
                                 future.get(0, java.util.concurrent.TimeUnit.MILLISECONDS);
                                 Log.i(TAG, "V2 AICore session prepared; feature=" + feature);
+                                recordStatus(hostContext, "V2_SESSION_READY", "feature=" + feature);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             } catch (Exception e) {
+                                recordStatus(hostContext, "V2_SESSION_FAILED", "feature=" + feature + " " + errorTypes(e));
                                 Log.w(TAG, "V2 AICore session failed; feature=" + feature
                                         + "; causes=" + errorTypes(e));
                             }
@@ -219,14 +251,32 @@ public final class PixelBoardModule extends XposedModule {
                 Object result = chain.proceed();
                 if (responses.incrementAndGet() <= 24 && result != null) {
                     try {
+                        recordStatus(hostContext, "V2_RESPONSE", "source=" + enumName(source.get(result))
+                                + " status=" + enumName(status.get(result)));
                         Log.i(TAG, "V2 response built: source=" + enumName(source.get(result))
                                 + " status=" + enumName(status.get(result)));
                     } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) { }
                 }
                 return result;
             });
+            try {
+                Method panel = new TargetMethod("htm", "E", "void", "java.lang.String",
+                        "java.lang.CharSequence", "htj", "java.lang.String", "boolean", "boolean",
+                        "xac", "boolean", "wyb").resolve(loader);
+                AtomicInteger panelEvents = new AtomicInteger();
+                hook(panel).intercept(chain -> {
+                    Object result = chain.proceed();
+                    if (chain.getArgs().size() == 9 && panelEvents.incrementAndGet() <= 12)
+                        recordStatus(hostContext, "V2_PANEL_ERROR", enumName(chain.getArgs().get(6)));
+                    return result;
+                });
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED", "PANEL_STATUS_OBSERVER_UNAVAILABLE");
+            }
+            recordStatus(hostContext, "V2_DIAGNOSTICS_READY", "route session response");
             Log.i(TAG, "V2 route/session/response observers installed; no text logged");
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED", e.getClass().getName());
             Log.w(TAG, "V2 backend diagnostics incomplete; original backend behavior retained", e);
         }
     }
@@ -260,6 +310,9 @@ public final class PixelBoardModule extends XposedModule {
     private void initializeForGboard(ClassLoader loader, Context context) {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
         FeatureConfig.initialize(this);
+        recordStatus(context, "GBOARD_ATTACHED", "writingTools=" + FeatureConfig.writingTools()
+                + " v2Requested=" + FeatureConfig.writingToolsV2()
+                + " backend=" + FeatureConfig.writingToolsBackend());
         try {
             PackageInfo pkg = context.getPackageManager().getPackageInfo(GBOARD, 0);
             verifiedWritingTools184 = pkg.getLongVersionCode() == 176027078L
@@ -277,12 +330,15 @@ public final class PixelBoardModule extends XposedModule {
         if (FeatureConfig.writingToolsV2()) {
             if (!verifiedV2) {
                 Log.w(TAG, "V2 blocked=GBOARD_PROFILE_UNSUPPORTED; basic cloud policy retained");
+                recordStatus(context, "V2_PROFILE_FAILED", "GBOARD_PROFILE_UNSUPPORTED");
             } else {
                 WritingToolsBackendCheck.Result prerequisites = WritingToolsBackendCheck.check(
                         context, FeatureConfig.writingToolsBackend());
                 v2CanAttempt = prerequisites.canAttempt;
                 Log.i(TAG, "V2 binding preflight: canAttempt=" + v2CanAttempt
                         + " reason=" + prerequisites.code + "; " + prerequisites.message);
+                recordStatus(context, "MODE", "canAttempt=" + v2CanAttempt
+                        + " reason=" + prerequisites.code + " requestedBackend=" + FeatureConfig.writingToolsBackend());
             }
         }
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
@@ -303,7 +359,10 @@ public final class PixelBoardModule extends XposedModule {
                     ? RamblerFlagBindings.resolve(loader, voiceProfile.id)
                     : RamblerFlagBindings.resolveUnique(loader);
             if (flags != null) installFlagGetter(flags);
-            else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
+            else {
+                Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
+                recordStatus(context, "FLAGS_FAILED", "NO_UNIQUE_FLAG_GETTER");
+            }
         }
         if (FeatureConfig.writingTools()) {
             boolean v2 = v2CanAttempt;
@@ -311,6 +370,9 @@ public final class PixelBoardModule extends XposedModule {
                     + "; V2=" + v2 + "; effectiveBackend=" + (v2 ? FeatureConfig.writingToolsBackend() : 1)
                     + "; requestedBackend=" + FeatureConfig.writingToolsBackend()
                     + "; real provisioning/consent/account checks retained");
+            recordStatus(context, "MODE", "effectiveV2=" + v2 + " effectiveBackend="
+                    + (v2 ? FeatureConfig.writingToolsBackend() : 1) + " requestedBackend="
+                    + FeatureConfig.writingToolsBackend());
         }
     }
 
@@ -402,9 +464,11 @@ public final class PixelBoardModule extends XposedModule {
                     return original;
                 }
             });
+            recordStatus(hostContext, "FLAGS_READY", "profile=" + binding.profile);
             Log.i(TAG, "Installed shared guarded Rambler/WritingTools flag policy: " + binding.owner
                     + " / profile=" + binding.profile);
         } catch (RuntimeException | LinkageError e) {
+            recordStatus(hostContext, "FLAGS_FAILED", e.getClass().getName());
             Log.w(TAG, "Flag getter hook skipped", e);
         }
     }
@@ -448,6 +512,7 @@ public final class PixelBoardModule extends XposedModule {
                                         ? ((Enum<?>) value).name() : "<unknown>");
                             }
                             Log.i(TAG, line.toString());
+                            recordStatus(hostContext, "STATE", line.toString());
                         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
                             Log.w(TAG, "WritingTools state observation skipped", e);
                         }

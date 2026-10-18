@@ -6,9 +6,10 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.1.9-v2-bind-guard"
+        versionCode = 11
+        versionName = "0.1.10-runtime-status"
     }
+    buildFeatures { buildConfig = true }
     buildTypes {
         release {
             isMinifyEnabled = true

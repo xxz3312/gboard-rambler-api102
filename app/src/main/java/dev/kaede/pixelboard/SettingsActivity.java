@@ -13,6 +13,10 @@ import android.widget.TextView;
 /** On-device test configuration. Changes require restarting the Gboard process. */
 public final class SettingsActivity extends Activity {
     private SharedPreferences prefs;
+    private SharedPreferences runtimePrefs;
+    private TextView runtimeReport;
+    private final SharedPreferences.OnSharedPreferenceChangeListener runtimeListener =
+            (preferences, key) -> runOnUiThread(this::refreshRuntimeStatus);
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences("features", MODE_PRIVATE);
@@ -24,7 +28,7 @@ public final class SettingsActivity extends Activity {
         root.addView(list);
         addText(list, "Gboard Rambler · API 102", true);
         addText(list, "Experimental features. Changes take effect after Gboard is stopped and restarted. Not all features are implemented.", false);
-        addToggle(list,"rambler","Rambler (experimental)","May alter eligible Gboard feature flags; not verified.");
+        addToggle(list,"rambler","Rambler (experimental)","当前设备已验证 Rambler；更改后需重启 Gboard。");
         addToggle(list,"spellchecker","Inline spellchecker (experimental)","Obfuscated method mapping needs on-device validation.");
         addToggle(list,"diagnostics","Diagnostic hooks","Observe selection and emit Android logcat messages.");
         addToggle(list,"writing_tools","AI 写作工具 · 总开关","默认使用基础云端校对/改写；V2 需另行开启。0.1.7 已验证入口及英语校对；修改后需强制停止并重新打开 Gboard。建议先在便签中使用英语测试，默认校对应用排除列表包含 ChatGPT。");
@@ -62,8 +66,57 @@ public final class SettingsActivity extends Activity {
         list.addView(status);
         addText(list, "LSPosed framework service: " + (((ModuleApp)getApplication()).connected() ? "connected" : "not connected") + ". Configuration sync is retried upon connection.", false);
         addText(list, "Logcat filter: PixelBoardLS. Toggle state is not proof of successful Hook installation.", false);
+        addText(list, "模块运行状态", true);
+        addText(list, "显示本模块收到的启动与请求事件，不包含输入文本。"
+                + "通道自检只验证状态传递，不代表已注入 Gboard。", false);
+        runtimePrefs = getSharedPreferences(RuntimeStatus.PREFS, MODE_PRIVATE);
+        runtimeReport = new TextView(this);
+        runtimeReport.setTextIsSelectable(true);
+        list.addView(runtimeReport);
+        android.widget.Button copyStatus = new android.widget.Button(this);
+        copyStatus.setText("复制运行状态");
+        copyStatus.setOnClickListener(v -> {
+            refreshRuntimeStatus();
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                    getSystemService(CLIPBOARD_SERVICE);
+            if (clipboard != null) clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                    "Writing Tools 运行状态", runtimeReport.getText()));
+            android.widget.Toast.makeText(this, "已复制", android.widget.Toast.LENGTH_SHORT).show();
+        });
+        list.addView(copyStatus);
+        android.widget.Button channelTest = new android.widget.Button(this);
+        channelTest.setText("诊断通道自检");
+        channelTest.setOnClickListener(v -> RuntimeStatus.send(this, "CHANNEL_TEST", "transport_only=true"));
+        list.addView(channelTest);
         setContentView(root);
     }
+
+    @Override protected void onResume() {
+        super.onResume();
+        runtimePrefs.registerOnSharedPreferenceChangeListener(runtimeListener);
+        refreshRuntimeStatus();
+    }
+
+    @Override protected void onPause() {
+        runtimePrefs.unregisterOnSharedPreferenceChangeListener(runtimeListener);
+        super.onPause();
+    }
+
+    private void refreshRuntimeStatus() {
+        if (runtimeReport == null || runtimePrefs == null) return;
+        String history = runtimePrefs.getString("history", "");
+        String attached = runtimePrefs.getString(
+                "last_com.google.android.inputmethod.latin_GBOARD_ATTACHED", "");
+        runtimeReport.setText("模块版本：" + BuildConfig.VERSION_NAME
+                + "\n保存配置：V2=" + (prefs.getBoolean("writing_tools", false)
+                        && prefs.getBoolean("writing_tools_v2", false))
+                + " 后端=" + prefs.getInt("writing_tools_backend", 2)
+                + "\n最近一次 Gboard 初始化事件：\n"
+                + (attached.isEmpty() ? "尚未收到。可能尚未重启进程或状态通道未送达；不能单凭此项判定未注入。" : attached)
+                + "\n最近 40 条事件：\n"
+                + (history.isEmpty() ? "暂无事件。可先点击诊断通道自检。" : history));
+    }
+
     private void addToggle(LinearLayout parent, String key, String title, String note) {
         CheckBox toggle = new CheckBox(this);
         toggle.setText(title);

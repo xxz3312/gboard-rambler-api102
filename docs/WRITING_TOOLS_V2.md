@@ -109,3 +109,39 @@ an absent AICore grant does not by itself block the Astrea choice.
 This guard prevents the known configuration failure. It does not grant a
 permission, bypass system security, fix missing models or repair the remote
 INVALID_ARGUMENT result. A successful preflight is not a successful RPC.
+
+## 0.1.10 in-app runtime report
+
+The user's AICore grant is now true, Gboard is the active IME with a running
+process, and the main log buffer is present. Existing logcat output still does
+not establish which hooks or V2 requests ran.
+
+This build adds a private, bounded runtime report in the module settings, with
+copy and transport self-test buttons. Android 34+ explicit broadcasts use
+BroadcastOptions.setShareIdentityEnabled(true). The receiver verifies the
+system-provided sender package and UID against the three scoped packages (the
+module itself may only send a CHANNEL_TEST). Intent extras cannot provide sender
+identity. History is limited to forty records, and the most recent Gboard
+initialization record is retained separately. Details contain only fixed event
+codes, module version, PID, selected backend and bounded metadata; no keyboard
+text, prompts, responses, tokens, raw exceptions or binder objects are sent.
+
+Critical events also go to the LSPosed framework logger, independently of app
+logcat. The startup code handles an already-existing Gboard Application with the
+same AtomicBoolean once-only guard as the attach hook. This covers late package
+initialization without treating that timing issue as the proven current cause.
+
+New event categories distinguish initialization, flag-hook installation,
+effective mode, V2 backend selection, session preparation completion/failure,
+response source/status, and the prompt panel's status enum. Observers preserve
+original return values, future ownership, eligibility and request content.
+
+Open the module once after installation, run the diagnostic channel self-test,
+then restart Gboard and reproduce one actual Writing Tools attempt. Return to
+the module and copy the runtime status. Self-test delivery alone does not prove
+Gboard injection; absence of a Gboard event can mean a process not yet restarted
+or delivery failure and is not labelled definitive non-injection.
+
+Compilation and host-side format/policy tests do not verify cross-process
+broadcast delivery on the user's ROM. Android versions below 34 retain framework
+logging but do not use this status broadcast channel.

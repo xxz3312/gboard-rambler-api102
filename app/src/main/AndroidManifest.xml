@@ -7,6 +7,7 @@
     </queries>
     <application android:name=".ModuleApp" android:label="Gboard Rambler API102"
         android:description="@string/module_description" android:allowBackup="false">
+        <receiver android:name=".RuntimeStatusReceiver" android:exported="true"/>
         <activity android:name=".AiCoreProbeActivity" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="true">
             <intent-filter>
