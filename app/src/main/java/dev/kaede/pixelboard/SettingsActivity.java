@@ -36,6 +36,9 @@ public final class SettingsActivity extends Activity {
                 "需同时开启 AI 写作工具。仅适配 Gboard 18.4.1.985164140（176027078）。"
                 + "可能触发官方模型准备或下载，需要完成 Gboard 自身的使用同意。"
                 + "缺少服务绑定权限时自动保留基础云端模式；其他不可用情况可关闭本开关并重启 Gboard 恢复。");
+        addToggle(list, "v2_local_proofread", "AICore 端侧校对 · 可选实验",
+                "默认关闭。AICore 私有改写与端侧校对分别检查可用性；开启后会额外等待端侧校对。"
+                + "本轮请保持关闭，仅测试私有改写路径。");
         addText(list, "V2 后端（仅实验模式生效）", true);
         android.widget.RadioGroup backends = new android.widget.RadioGroup(this);
         android.widget.RadioButton aicore = new android.widget.RadioButton(this);
@@ -107,12 +110,22 @@ public final class SettingsActivity extends Activity {
         String history = runtimePrefs.getString("history", "");
         String attached = runtimePrefs.getString(
                 "last_com.google.android.inputmethod.latin_GBOARD_ATTACHED", "");
+        String activity = "";
+        for (java.util.Map.Entry<String, ?> entry : runtimePrefs.getAll().entrySet())
+            if (entry.getKey().startsWith("last_com.google.android.inputmethod.latin_")
+                    && entry.getValue() instanceof String
+                    && ((String) entry.getValue()).compareTo(activity) > 0)
+                activity = (String) entry.getValue();
+        String initialization = !attached.isEmpty() ? attached
+                : !activity.isEmpty() ? "已收到 Gboard 运行事件；启动事件未保存。\n" + activity
+                : "尚未收到 Gboard 事件。可能尚未重启进程或状态通道未送达。";
         runtimeReport.setText("模块版本：" + BuildConfig.VERSION_NAME
                 + "\n保存配置：V2=" + (prefs.getBoolean("writing_tools", false)
                         && prefs.getBoolean("writing_tools_v2", false))
                 + " 后端=" + prefs.getInt("writing_tools_backend", 2)
+                + " 端侧校对请求=" + prefs.getBoolean("v2_local_proofread", false)
                 + "\n最近一次 Gboard 初始化事件：\n"
-                + (attached.isEmpty() ? "尚未收到。可能尚未重启进程或状态通道未送达；不能单凭此项判定未注入。" : attached)
+                + initialization
                 + "\n最近 40 条事件：\n"
                 + (history.isEmpty() ? "暂无事件。可先点击诊断通道自检。" : history));
     }

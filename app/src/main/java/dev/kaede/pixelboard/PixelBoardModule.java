@@ -273,11 +273,55 @@ public final class PixelBoardModule extends XposedModule {
             } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
                 recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED", "PANEL_STATUS_OBSERVER_UNAVAILABLE");
             }
-            recordStatus(hostContext, "V2_DIAGNOSTICS_READY", "route session response");
+            observeV2Availability(loader);
+            recordStatus(hostContext, "V2_DIAGNOSTICS_READY", "route session response availability");
             Log.i(TAG, "V2 route/session/response observers installed; no text logged");
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED", e.getClass().getName());
             Log.w(TAG, "V2 backend diagnostics incomplete; original backend behavior retained", e);
+        }
+    }
+
+
+    private void observeV2Availability(ClassLoader loader) {
+        try {
+            Method listener = new TargetMethod("xin", "b", "void", "java.lang.Runnable",
+                    "java.util.concurrent.Executor").resolve(loader);
+            for (String owner : new String[] {"ojq", "imu", "hgm"}) {
+                Method check = new TargetMethod(owner, "b", "xin", "android.content.Context").resolve(loader);
+                String label = "ojq".equals(owner) ? "private703" : "imu".equals(owner) ? "localProofread" : "hybrid";
+                AtomicInteger checks = new AtomicInteger();
+                java.util.Set<Object> observed = java.util.Collections.synchronizedSet(
+                        java.util.Collections.newSetFromMap(new java.util.WeakHashMap<Object, Boolean>()));
+                hook(check).intercept(chain -> {
+                    Object result = chain.proceed();
+                    if (result instanceof java.util.concurrent.Future && observed.add(result)
+                            && checks.incrementAndGet() <= 6) {
+                        recordStatus(hostContext, "V2_AVAILABILITY_REQUEST", "source=" + label);
+                        java.util.concurrent.Future<?> future = (java.util.concurrent.Future<?>) result;
+                        try {
+                            listener.invoke(result, (Runnable) () -> {
+                                if (!future.isDone()) return;
+                                try {
+                                    Object value = future.get(0, java.util.concurrent.TimeUnit.MILLISECONDS);
+                                    recordStatus(hostContext, "V2_AVAILABILITY", "source=" + label
+                                            + " status=" + enumName(value));
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                } catch (Exception e) {
+                                    recordStatus(hostContext, "V2_AVAILABILITY_FAILED",
+                                            "source=" + label + " " + errorTypes(e));
+                                }
+                            }, (java.util.concurrent.Executor) Runnable::run);
+                        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                            recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED", "availability_listener_" + label);
+                        }
+                    }
+                    return result;
+                });
+            }
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            recordStatus(hostContext, "V2_DIAGNOSTICS_FAILED", "availability_" + e.getClass().getSimpleName());
         }
     }
 
@@ -372,7 +416,7 @@ public final class PixelBoardModule extends XposedModule {
                     + "; real provisioning/consent/account checks retained");
             recordStatus(context, "MODE", "effectiveV2=" + v2 + " effectiveBackend="
                     + (v2 ? FeatureConfig.writingToolsBackend() : 1) + " requestedBackend="
-                    + FeatureConfig.writingToolsBackend());
+                    + FeatureConfig.writingToolsBackend() + " localProofread=" + FeatureConfig.v2LocalProofread());
         }
     }
 
@@ -445,7 +489,7 @@ public final class PixelBoardModule extends XposedModule {
                     Object writingResult = "writing_tools_enable_stable_entrance".equals(flag)
                             && !verifiedWritingTools184 ? original
                             : WritingToolsFlagPolicy.overrideValue(flag, original, FeatureConfig.writingTools(),
-                                    v2CanAttempt, FeatureConfig.writingToolsBackend());
+                                    v2CanAttempt, FeatureConfig.writingToolsBackend(), FeatureConfig.v2LocalProofread());
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.isToolbarFlag(flag)) {
                         int reads = writingToolbarReadCount.incrementAndGet();
                         if (reads <= 5)
@@ -513,6 +557,7 @@ public final class PixelBoardModule extends XposedModule {
                             }
                             Log.i(TAG, line.toString());
                             recordStatus(hostContext, "STATE", line.toString());
+                            recordStatus(hostContext, "HANDLER_STATUS", WritingToolsHandlerSnapshot.read(loader));
                         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
                             Log.w(TAG, "WritingTools state observation skipped", e);
                         }

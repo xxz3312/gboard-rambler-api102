@@ -7,7 +7,8 @@ Text replacement, other styles and V2 backends have not yet been confirmed.
 ## Implemented
 
 - Independent V2 opt-in, off by default. The main Writing Tools switch is required.
-- AICore (backend 2): hybrid=true, on-device proofread=true.
+- AICore (backend 2): hybrid=true. From 0.1.11, on-device proofread defaults false
+  and is an independent opt-in; earlier builds enabled it together with backend 2.
 - Astrea (backend 3): hybrid=true, on-device proofread=false.
 - The V2 presentation flags follow the selected experimental mode.
 - Disabling V2 restores the exact 0.1.7 basic policy at the next Gboard start:
@@ -145,3 +146,54 @@ or delivery failure and is not labelled definitive non-injection.
 Compilation and host-side format/policy tests do not verify cross-process
 broadcast delivery on the user's ROM. Android versions below 34 retain framework
 logging but do not use this status broadcast channel.
+
+## 0.1.11 private availability and optional local proofreading
+
+The supplied 0.1.10 runtime report confirms Gboard hook execution and real backend
+selection PRIVATE_INFERENCE_AICORE. It reports proofreadProvisioned/Ready=true,
+handlerEverProvisioned=true, but current handler provisioned/ready=false.
+This excludes missing injection as the explanation for that attempt.
+
+Decoded 18.4 instructions show qrr.<clinit> initially sets the base proofread
+signals true; they do not establish private or on-device model availability.
+qrr.b returns the active handler kind (1 base, 2 on-device, 3 hybrid), and qrr.a
+maps the current signals to that kind's actual signals.
+
+hfz (HybridGenAi) registers with ojm, checks availability asynchronously and
+updates a real oiz status enum. oiz includes UNKNOWN, READY,
+AI_CORE_CONNECTION_ERROR, AI_CORE_MODEL_NOT_FOUND, AI_CORE_MODEL_DOWNLOADABLE,
+AI_CORE_MODEL_DOWNLOADING and HYBRID_MODEL_TEMPORARILY_UNAVAILABLE.
+No status is forced in this module.
+
+Previously backend 2 also enabled inw.a/enable_on_device_proofread, creating an
+optional imu local proofreader. hgm.b waits for both the private handler and this
+optional local handler before combining availability. A pending local check can
+therefore delay the aggregate result even when the private request has finished.
+This is a verified dependency, not a claim that it is the only cause of the
+user's failure.
+
+0.1.11 separates the local proofreader into an off-by-default switch. Backend 2
+still selects the same private AICore path; backend 3 never enables the optional
+local proofreader. Base cloud policy, model IDs, consent and readiness remain
+unchanged. The new setting is synchronized through the API 102 preference bridge.
+
+New read-only observers report:
+- ojq.b(Context):xin completion for the private Feature 703 availability check;
+- imu.b(Context):xin completion when optional local proofreading is requested;
+- hgm.b(Context):xin aggregate completion;
+- active handler kind/class, hfz.g enum, and pending/done metadata for status checks.
+
+The snapshot reads fields and signal-registry state only. It does not invoke
+a model-status getter that might schedule work, submit inference, download a
+model or alter the existing future. Completion observers use zero-timeout reads
+only after completion and never cancel or close the original operation.
+
+The report now acknowledges later Gboard events when its initial broadcast was
+not retained, instead of implying that a missing startup record means missing
+injection. The new opt-in isolation is covered by host-side policy tests.
+
+Test with the main Writing Tools and V2 switches enabled, backend AICore,
+optional local proofreading off. Restart the affected processes, attempt one
+Writing Tools operation, then copy the module's runtime report. Private status
+failure still requires interpreting the actual enum and backend response;
+0.1.11 does not claim to fix a missing Feature 703 or server manifest rejection.

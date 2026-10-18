@@ -66,6 +66,11 @@ public final class WritingToolsFlagPolicy {
 
     static Object overrideValue(String name, Object original, boolean enabled,
             boolean v2VerifiedAndEnabled, int requestedBackend) {
+        return overrideValue(name, original, enabled, v2VerifiedAndEnabled, requestedBackend, false);
+    }
+
+    static Object overrideValue(String name, Object original, boolean enabled,
+            boolean v2VerifiedAndEnabled, int requestedBackend, boolean localProofread) {
         if (!enabled || !targeted(name)) return original;
         boolean v2 = v2VerifiedAndEnabled && (requestedBackend == 2 || requestedBackend == 3);
         if ("writing_tools_v2_backend_type".equals(name))
@@ -78,7 +83,7 @@ public final class WritingToolsFlagPolicy {
         if (V2_FLAGS.contains(name) || "writing_tools_enable_hybrid".equals(name))
             return Boolean.valueOf(v2);
         if ("enable_on_device_proofread".equals(name))
-            return Boolean.valueOf(v2 && requestedBackend == 2);
+            return Boolean.valueOf(v2 && requestedBackend == 2 && localProofread);
         if (LEGACY.contains(name) || "enable_writing_tools_voice_commands".equals(name))
             return Boolean.TRUE;
         return original;

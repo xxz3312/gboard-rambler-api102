@@ -8,11 +8,11 @@ import io.github.libxposed.api.XposedModule;
 public final class FeatureConfig {
     private static final String TAG = "PixelBoardLS";
     public static final String GROUP = "features";
-    private static volatile boolean rambler, spellchecker, diagnostics, writingTools, writingToolsV2;
+    private static volatile boolean rambler, spellchecker, diagnostics, writingTools, writingToolsV2, v2LocalProofread;
     private static volatile int writingToolsBackend = 2;
     private FeatureConfig() {}
     public static void initialize(XposedModule module) {
-        rambler = spellchecker = diagnostics = writingTools = writingToolsV2 = false;
+        rambler = spellchecker = diagnostics = writingTools = writingToolsV2 = v2LocalProofread = false;
         writingToolsBackend = 2;
         try {
             SharedPreferences p = module.getRemotePreferences(GROUP);
@@ -21,11 +21,12 @@ public final class FeatureConfig {
             diagnostics = p.getBoolean("diagnostics", false);
             writingTools = p.getBoolean("writing_tools", false);
             writingToolsV2 = writingTools && p.getBoolean("writing_tools_v2", false);
+            v2LocalProofread = p.getBoolean("v2_local_proofread", false);
             writingToolsBackend = p.getInt("writing_tools_backend", 2) == 3 ? 3 : 2;
             module.log(Log.INFO, TAG, "Remote settings read: rambler=" + rambler
                     + ", diagnostics=" + diagnostics + ", spellchecker=" + spellchecker
                     + ", writingTools=" + writingTools + ", v2Requested=" + writingToolsV2
-                    + ", requestedBackend=" + writingToolsBackend);
+                    + ", requestedBackend=" + writingToolsBackend + ", localProofreadRequested=" + v2LocalProofread);
         } catch (RuntimeException e) {
             writingToolsV2 = false;
             module.log(Log.ERROR, TAG, "Remote settings unavailable; fail closed", e);
@@ -36,5 +37,6 @@ public final class FeatureConfig {
     public static boolean diagnostics() { return diagnostics; }
     public static boolean writingTools() { return writingTools; }
     public static boolean writingToolsV2() { return writingToolsV2; }
+    public static boolean v2LocalProofread() { return v2LocalProofread; }
     public static int writingToolsBackend() { return writingToolsBackend; }
 }

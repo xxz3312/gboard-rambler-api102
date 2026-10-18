@@ -12,7 +12,8 @@ public final class RuntimeStatusFormat {
             "MODE", "STATE", "BACKEND_PACKAGE", "ASTREA_FLAG", "MANIFEST_REQUEST",
             "V2_PROFILE_FAILED", "V2_DIAGNOSTICS_READY", "V2_DIAGNOSTICS_FAILED",
             "V2_ROUTE", "V2_SESSION_REQUEST", "V2_SESSION_READY", "V2_SESSION_FAILED",
-            "V2_RESPONSE", "V2_PANEL_ERROR"));
+            "V2_RESPONSE", "V2_PANEL_ERROR", "HANDLER_STATUS", "V2_AVAILABILITY_REQUEST",
+            "V2_AVAILABILITY", "V2_AVAILABILITY_FAILED"));
     public static boolean allowedEvent(String code) { return EVENTS.contains(code); }
     public static String metadata(String text) {
         if (text == null) return "";

@@ -70,7 +70,7 @@ public final class WritingToolsFlagPolicyTest {
     @Test public void privateBackendsHaveDistinctPoliciesAndCanBeDisabled() {
         for (int backend : new int[] {2, 3}) {
             for (String flag : OFF) {
-                boolean expected = !"enable_on_device_proofread".equals(flag) || backend == 2;
+                boolean expected = !"enable_on_device_proofread".equals(flag);
                 assertEquals(flag, Boolean.valueOf(expected),
                         WritingToolsFlagPolicy.overrideValue(flag, Boolean.FALSE, true, true, backend));
                 assertEquals(flag, apply(flag, Boolean.FALSE),
@@ -110,5 +110,17 @@ public final class WritingToolsFlagPolicyTest {
                 assertEquals(Boolean.FALSE, WritingToolsFlagPolicy.overrideValue(
                         flag, Boolean.TRUE, true, true, backend));
         }
+    }
+
+    @Test public void localProofreadingIsIndependentAndOptIn() {
+        String flag = "enable_on_device_proofread";
+        assertEquals(Boolean.FALSE, WritingToolsFlagPolicy.overrideValue(flag, Boolean.TRUE, true, true, 2));
+        assertEquals(Boolean.TRUE, WritingToolsFlagPolicy.overrideValue(flag, Boolean.FALSE, true, true, 2, true));
+        assertEquals(Boolean.FALSE, WritingToolsFlagPolicy.overrideValue(flag, Boolean.TRUE, true, false, 2, true));
+        assertEquals(Boolean.FALSE, WritingToolsFlagPolicy.overrideValue(flag, Boolean.TRUE, true, true, 3, true));
+        assertEquals(Boolean.TRUE, WritingToolsFlagPolicy.overrideValue(flag, Boolean.TRUE, false, true, 2, true));
+        // Private backend selection is unchanged when local proofreading is off.
+        assertEquals(Long.valueOf(2), WritingToolsFlagPolicy.overrideValue(
+                "writing_tools_v2_backend_type", Long.valueOf(1), true, true, 2, false));
     }
 }
