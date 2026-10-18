@@ -53,3 +53,16 @@ No GitHub Actions build or release was triggered.
   branch semantics, or Writing Tools toolbar eligibility.
 - The upstream 18.0.3 signal/resource identities must be revalidated for the
   actual Gboard build before safely applying runtime result changes.
+
+## Upstream provenance review
+- The published PixelBoard Writing Tools patch registration invokes the shared
+  flag-family patch and 18.0.3 AutoFix / initialization bytecode patches.
+- The upstream runtime **contains** signal and Settings Controller helper methods,
+  but finding helper methods does **not** establish that they are reachable from
+  stock Gboard. The inspected WritingToolsFlagValuePatch has no matching injected
+  call sites for `applySignalResult`, `enterSettingsControllerScope`, or
+  `shouldBypassSettingsRemoval`; they are NOT treated as verified fixes.
+- The first practical prerequisite is proof that a typed flag getter maps to the
+  actual installed Gboard version. Diagnostics now report unique getter resolution.
+- To port a settings-removal bypass or signal override, derive the concrete
+  caller/target from a matching APK's method graph before installing a hook.
