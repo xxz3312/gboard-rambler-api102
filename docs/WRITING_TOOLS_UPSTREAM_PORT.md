@@ -82,3 +82,15 @@ Consequences:
   cross-references from DEX code, not names or 18.0.3 obfuscation alone.
 - No verified UI-controller bypass or equivalent AutoFix instruction-level
   hook has yet been established.
+
+## 18.4.1 direct DEX instruction cross-reference (confirmed)
+- `enable_writing_tools_v2_on_toolbar` is constructed in
+  `Lplx;-><clinit>()V` and stored in static field `Lplx;->n`.
+- `Lpmb;->n` reads `Lplx;->n` (confirmed DEX `sget` reference).
+- The named field is not itself a Boolean: it is a typed flag object.
+  The value computation and disabled-state/UI construction still require
+  method-level control-flow inspection, including `Lpmb;->n` and callers.
+- **Do not hook `Lpmb;->n` to unconditional true:** this would ignore
+  arguments/return type/feature eligibility and could damage keyboard.
+- The earlier 18.0.3 signal candidate `lvi#b` was invalid; the direct
+  18.4.1 toolbar flag xref is a more reliable path.
