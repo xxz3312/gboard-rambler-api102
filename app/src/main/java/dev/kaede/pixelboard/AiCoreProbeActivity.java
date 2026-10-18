@@ -107,7 +107,7 @@ public final class AiCoreProbeActivity extends Activity {
     }
 
     private String deviceReport() {
-        StringBuilder text = new StringBuilder("版本：0.1.2-aicore-probe\n");
+        StringBuilder text = new StringBuilder("版本：0.1.3-aicore-bind\n");
         text.append("设备：").append(Build.MANUFACTURER).append(" ")
                 .append(Build.MODEL).append(" / ").append(Build.DEVICE)
                 .append("\nAndroid API：").append(Build.VERSION.SDK_INT).append("\n");
@@ -122,9 +122,74 @@ public final class AiCoreProbeActivity extends Activity {
         } catch (RuntimeException e) {
             text.append("AICore 包查询异常：").append(describe(e));
         }
+        appendBindingReport(text);
         text.append("\n注意：官方文档不支持解锁 Bootloader 的设备；"
                 + "服务初始化、机型、语言和模型配置也会影响结果。\n");
         return text.toString();
+    }
+
+
+    private void appendBindingReport(StringBuilder text) {
+        PackageManager pm = getPackageManager();
+        String bindingPermission = "com.google.android.apps.aicore.service.BIND_SERVICE";
+        text.append("\n绑定权限诊断：");
+        try {
+            PackageInfo own = pm.getPackageInfo(getPackageName(), PackageManager.GET_PERMISSIONS);
+            boolean requested = own.requestedPermissions != null
+                    && java.util.Arrays.asList(own.requestedPermissions).contains(bindingPermission);
+            text.append("\n模块已声明 BIND_SERVICE：").append(requested);
+        } catch (PackageManager.NameNotFoundException | RuntimeException e) {
+            text.append("\n模块权限查询失败：").append(describe(e));
+        }
+        for (String className : new String[] {
+                "com.google.android.apps.aicore.service.multiuser.AiCoreMultiUserService",
+                "com.google.android.apps.aicore.service.AiCoreService"}) {
+            try {
+                android.content.pm.ServiceInfo service = pm.getServiceInfo(
+                        new android.content.ComponentName("com.google.android.aicore", className),
+                        PackageManager.MATCH_DISABLED_COMPONENTS);
+                text.append("\n服务：").append(className)
+                        .append("\n  enabled=").append(service.enabled)
+                        .append(", exported=").append(service.exported)
+                        .append("\n  要求权限：").append(service.permission == null ? "(无)" : service.permission);
+                if (service.permission != null) appendPermissionReport(text, pm, service.permission);
+            } catch (PackageManager.NameNotFoundException e) {
+                text.append("\n服务未找到：").append(className);
+            } catch (RuntimeException e) {
+                text.append("\n服务查询失败：").append(describe(e));
+            }
+        }
+        // Also report the known permission if no visible service descriptor exposed it.
+        appendPermissionReport(text, pm, bindingPermission);
+    }
+
+    private void appendPermissionReport(StringBuilder text, PackageManager pm, String name) {
+        try {
+            android.content.pm.PermissionInfo permission = pm.getPermissionInfo(name, 0);
+            text.append("\n  权限：").append(name)
+                    .append("\n  定义包：").append(permission.packageName)
+                    .append("\n  protectionLevel=0x")
+                    .append(Integer.toHexString(permission.protectionLevel))
+                    .append("（基础类型：").append(protectionBase(permission.getProtection())).append("）")
+                    .append("\n  模块已获授权：")
+                    .append(pm.checkPermission(name, getPackageName()) == PackageManager.PERMISSION_GRANTED)
+                    .append("\n  Gboard 已获授权：")
+                    .append(pm.checkPermission(name, "com.google.android.inputmethod.latin")
+                            == PackageManager.PERMISSION_GRANTED);
+        } catch (PackageManager.NameNotFoundException e) {
+            text.append("\n  未找到权限定义：").append(name);
+        } catch (RuntimeException e) {
+            text.append("\n  权限检查失败：").append(describe(e));
+        }
+    }
+
+    private static String protectionBase(int protection) {
+        switch (protection) {
+            case android.content.pm.PermissionInfo.PROTECTION_NORMAL: return "normal";
+            case android.content.pm.PermissionInfo.PROTECTION_DANGEROUS: return "dangerous";
+            case android.content.pm.PermissionInfo.PROTECTION_SIGNATURE: return "signature";
+            default: return "other:" + protection;
+        }
     }
 
     private void probeRewrite(int token) {

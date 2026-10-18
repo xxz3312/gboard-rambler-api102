@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.2-aicore-probe"
+        versionCode = 4
+        versionName = "0.1.3-aicore-bind"
     }
     buildTypes {
         release {
