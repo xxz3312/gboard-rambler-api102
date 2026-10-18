@@ -29,12 +29,20 @@ public final class WritingToolsFlagPolicy {
         new HashSet<>(Arrays.asList(
             "enable_writing_tools_v2",
             "enable_writing_tools_v2_on_toolbar",
-            "writing_tools_v2"
+            "writing_tools_v2",
+            "writing_tools_v2_enable_suggested_instructions",
+            "writing_tools_v2_enable_suggested_instructions_in_draft_response",
+            "writing_tools_v2_display_instruction_suggestions_in_zero_state",
+            "writing_tools_v2_allow_empty_user_instruction",
+            "writing_tools_v2_show_predefined_prompts"
         )));
     public static boolean targeted(String name) {
         return name != null && (LEGACY.contains(name) || CLOUD_ENTRY.contains(name)
                 || "enable_writing_tools_voice_commands".equals(name)
                 || "writing_tools_v2_backend_type".equals(name));
+    }
+    public static boolean isToolbarFlag(String name) {
+        return "enable_writing_tools_v2_on_toolbar".equals(name);
     }
     public static Object transform(String name, Object original, Context context) {
         if (!FeatureConfig.writingTools() || context == null || !targeted(name))
