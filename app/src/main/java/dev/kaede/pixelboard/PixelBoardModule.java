@@ -18,6 +18,7 @@ public final class PixelBoardModule extends XposedModule {
 
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
     private final AtomicInteger writingFlagLogCount = new AtomicInteger(0);
+    private volatile Context hostContext;
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
         Log.i(TAG, "PixelBoard API102 entry loaded");
@@ -51,6 +52,7 @@ public final class PixelBoardModule extends XposedModule {
     }
 
     private void initializeForGboard(ClassLoader loader, Context context) {
+        hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
         FeatureConfig.initialize(this);
         try {
             PackageInfo pkg = context.getPackageManager().getPackageInfo(GBOARD, 0);
@@ -143,9 +145,10 @@ public final class PixelBoardModule extends XposedModule {
                 try {
                     String flag = binding.name(receiver);
                     if (!RamblerFlagPolicy.targeted(flag) && !WritingToolsFlagPolicy.targeted(flag)) return original;
-                    Context context = GboardContext.current();
-                    if (context == null) return original;
-                    // Only if explicitly enabled AND a known profile and host context match.
+                    Context context = hostContext;
+                    if (context == null || !GBOARD.equals(context.getPackageName()))
+                        return original;
+                    // Use the Gboard-owned attach context, avoiding early ActivityThread nulls.
                     Object writingResult = WritingToolsFlagPolicy.transform(flag, original, context);
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.targeted(flag)
                             && writingFlagLogCount.incrementAndGet() <= 40) {
@@ -159,7 +162,8 @@ public final class PixelBoardModule extends XposedModule {
                     return original;
                 }
             });
-            Log.i(TAG, "Installed shared guarded Rambler/WritingTools flag policy: " + binding.owner);
+            Log.i(TAG, "Installed shared guarded Rambler/WritingTools flag policy: " + binding.owner
+                    + " / profile=" + binding.profile);
         } catch (RuntimeException | LinkageError e) {
             Log.w(TAG, "Flag getter hook skipped", e);
         }
