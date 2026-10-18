@@ -53,3 +53,32 @@ Upstream file paths:
 - `pixelboard-patches/patches/src/main/kotlin/com/akshaykadam/pixelboard/patches/gboard/registry/GboardPatchRegistry.kt`
 - `pixelboard-patches/patches/src/main/kotlin/com/akshaykadam/pixelboard/patches/gboard/features/writingtools/GboardAiWritingToolsFlagValuePatch.kt`
 - `pixelboard-patches/extensions/extension/src/main/java/com/akshaykadam/pixelboard/extension/writingtools/GboardAiWritingToolsRuntime.java`
+
+## Exact user APK analysis: Gboard 18.4.1.985164140 arm64-v8a
+
+Analyzed supplied 85 MB APK with DEX string/type/proto/method/field table
+inspection, not assumptions from 18.0.3. The APK has four DEX files.
+
+Verified:
+- `Lodx;->g()Ljava/lang/Object;` is present (classes.dex).
+- `Lodx;->a:Ljava/lang/String;` is present (classes.dex), matching the
+  existing typed flag-name getter mapping for Gboard 18.4.1.
+- Strings include `enable_writing_tools_v2`,
+  `enable_writing_tools_v2_on_toolbar`, `writing_helper`,
+  `config_proofread`.
+- In contrast, the upstream 18.0.3 AUTO_FIX and GenAI patch signatures
+  cannot be presumed valid for the installed 18.4.1 build.
+- Upstream candidate signal descriptor `Llvi;->b` is `long` in this APK
+  (classes2.dex); it is **not** a safe Writing Tools signal object to force.
+- `Lgvu;->a` exists but has type `Lwfr;`; its meaning and identity cannot
+  be inferred from the name alone.
+- `Lgqd;->a` was not among resolved fields in the inspected DEX field
+  inventory. Avoid using upstream 18.0.3 signal forcing.
+
+Consequences:
+- Keep the verified typed flag hook for 18.4.1, but stop treating upstream
+  18.0.3 signal specs as valid runtime patch targets.
+- Next identify 18.4.1's actual Writing Tools toolbar/policy conditions via
+  cross-references from DEX code, not names or 18.0.3 obfuscation alone.
+- No verified UI-controller bypass or equivalent AutoFix instruction-level
+  hook has yet been established.
