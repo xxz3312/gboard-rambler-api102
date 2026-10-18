@@ -1,6 +1,8 @@
 package dev.kaede.pixelboard;
 
 import android.content.Context;
+import android.app.Application;
+import java.util.concurrent.atomic.AtomicBoolean;
 import android.os.Build;
 import android.util.Log;
 import java.lang.reflect.Method;
@@ -12,15 +14,46 @@ public final class PixelBoardModule extends XposedModule {
     private static final String TAG = "PixelBoardLS";
     private static final String GBOARD = "com.google.android.inputmethod.latin";
 
+    private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
+
+    @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
+        Log.i(TAG, "PixelBoard API102 entry loaded");
+    }
+
     @Override public void onPackageReady(PackageReadyParam param) {
         if (!GBOARD.equals(param.getPackageName())) return;
         ClassLoader loader = param.getClassLoader();
         if (loader == null) { Log.w(TAG, "No Gboard classloader"); return; }
-        FeatureConfig.initialize(GboardContext.current());
-        Log.i(TAG, "Attached to Gboard on SDK " + Build.VERSION.SDK_INT);
+        Log.i(TAG, "Gboard package ready; waiting for Application.attach");
+        try {
+            Method attach = Application.class.getDeclaredMethod("attach", Context.class);
+            hook(attach).intercept(chain -> {
+                Object result = chain.proceed();
+                Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
+                if (arg instanceof Context && bootstrapped.compareAndSet(false, true)) {
+                    Context appContext = (Context) arg;
+                    if (GBOARD.equals(appContext.getPackageName())) {
+                        try { initializeForGboard(loader, appContext); }
+                        catch (Throwable ex) { Log.e(TAG, "Gboard post-attach initialization failed", ex); }
+                    } else {
+                        bootstrapped.set(false);
+                    }
+                }
+                return result;
+            });
+            Log.i(TAG, "Application.attach hook installed");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
+            Log.e(TAG, "Application.attach hook installation failed", ex);
+        }
+    }
+
+    private void initializeForGboard(ClassLoader loader, Context context) {
+        FeatureConfig.initialize(context);
+        Log.i(TAG, "Gboard Application Context available; SDK " + Build.VERSION.SDK_INT
+              + "; Rambler=" + FeatureConfig.rambler()
+              + "; diagnostics=" + FeatureConfig.diagnostics());
         if (FeatureConfig.spellchecker()) installSpellChecker(loader);
-        if (FeatureConfig.rambler() || FeatureConfig.diagnostics())
-            installRambler(loader);
+        if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) installRambler(loader);
         if (FeatureConfig.writingTools())
             Log.w(TAG, "Writing Tools not implemented; skipping");
     }

@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <provider android:authorities="dev.kaede.pixelboard.config"/>
+    </queries>
     <application android:label="Gboard Rambler API102" android:description="@string/module_description" android:allowBackup="false">
         <activity android:name=".SettingsActivity" android:exported="true">
             <intent-filter>
