@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 21
-        versionName = "0.1.20-local-prompt"
+        versionCode = 22
+        versionName = "0.1.21-prompt-coroutines-fix"
     }
     buildFeatures { buildConfig = true }
     buildTypes {
@@ -23,3 +23,9 @@ dependencies { implementation("org.luckypray:dexkit:2.3.0"); compileOnly("io.git
 
 
 
+
+// Prompt beta4 invokes interface-static Job.cancel$default, added in coroutines 1.11.
+// Its published metadata can otherwise resolve an older, binary-incompatible runtime.
+dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+}
