@@ -65,22 +65,15 @@ adb shell am start -n dev.kaede.pixelboard/.SettingsActivity
 adb shell pm enable dev.kaede.pixelboard/.Launcher
 ```
 
-## 源码与构建
+## 构建
 
-- [`v0.1.29`](https://github.com/xxz3312/gboard-rambler-api102/tree/v0.1.29)：本次发布附件对应的准确源码。
-- [`writing-tools-upstream-port`](https://github.com/xxz3312/gboard-rambler-api102/tree/writing-tools-upstream-port)：当前基础云端功能的维护分支。
-- `main`：项目入口；发布构建源码以对应标签为准。
-- `writing-tools-v2-experiment`：历史实验分支，不属于当前正式版，也不代表 AICore 本地推理已实现。
-
-构建环境：JDK 17、Gradle 9.4.1、Android SDK 37.0、Build Tools 36.0.0。请从发布标签或当前维护分支构建：
+环境：JDK 17、Gradle 9.4.1、Android SDK 37.0、Build Tools 36.0.0。
 
 ```sh
-git clone --branch v0.1.29 https://github.com/xxz3312/gboard-rambler-api102.git
-cd gboard-rambler-api102
 gradle :app:testDebugUnitTest :app:assembleRelease
 ```
 
-Release 构建启用 R8 代码裁剪与资源裁剪。Release 页面仅提供 APK 和对应源码下载。
+Release 构建启用 R8 和资源裁剪。
 
 ## 许可与来源
 
