@@ -46,6 +46,7 @@ public final class RuntimeProbe {
                     RuntimeStatus.send(context, "RUNTIME_ALIVE",
                             "v2=" + FeatureConfig.writingToolsV2()
                             + " backend=" + FeatureConfig.writingToolsBackend()
+                            + " " + GboardPixelIdentity.summary()
                             + " " + WritingToolsHandlerSnapshot.read(loader), nonce);
                 }
             }, new IntentFilter(RuntimeStatus.PING), Context.RECEIVER_EXPORTED);
@@ -101,4 +102,5 @@ public final class RuntimeProbe {
                 }, null, 0, null, null);
     }
 }
+
 

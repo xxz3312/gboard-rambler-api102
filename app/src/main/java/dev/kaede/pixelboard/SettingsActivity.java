@@ -39,6 +39,11 @@ public final class SettingsActivity extends Activity {
         addToggle(list, "v2_local_proofread", "AICore 端侧校对 · 可选实验",
                 "默认关闭。AICore 私有改写与端侧校对分别检查可用性；开启后会额外等待端侧校对。"
                 + "本轮请保持关闭，仅测试私有改写路径。");
+        addToggle(list, "gboard_pixel_identity", "仅 Gboard 伪装 Pixel 9 Pro · V2 实验",
+                "默认关闭，需同时开启 AI 写作工具和 V2。仅在 Gboard 进程内修改机型字段，"
+                + "用于比较本地设备判断；更改后必须重启 Gboard。"
+                + "AICore/PCS、系统属性和硬件证明保持原状；不保证获得模型或通过服务器认证。"
+                + "本实验会影响 Gboard 进程内其他读取这些字段的功能。关闭后重启 Gboard 恢复。");
         addText(list, "V2 后端（仅实验模式生效）", true);
         android.widget.RadioGroup backends = new android.widget.RadioGroup(this);
         android.widget.RadioButton aicore = new android.widget.RadioButton(this);
@@ -157,6 +162,10 @@ public final class SettingsActivity extends Activity {
                         && prefs.getBoolean("writing_tools_v2", false))
                 + " 后端=" + prefs.getInt("writing_tools_backend", 2)
                 + " 端侧校对请求=" + prefs.getBoolean("v2_local_proofread", false)
+                + " Pixel伪装请求=" + prefs.getBoolean("gboard_pixel_identity", false)
+                + "\n本版本 Gboard 机型事件（历史记录，实际读回以实时应答为准）：\n"
+                + runtimePrefs.getString("last_v_" + version + "_" + RuntimeStatus.GBOARD
+                        + "_GBOARD_IDENTITY", "尚未收到；保存开关不代表已经生效。")
                 + "\n本次实时查询：\n" + (!reply.isEmpty() ? reply
                         : requested ? "尚未收到本次应答；不能据此判定未注入。"
                         : "尚未查询。请唤起 Gboard 后点击实时查询。")
@@ -207,4 +216,5 @@ public final class SettingsActivity extends Activity {
         parent.addView(t);
     }
 }
+
 

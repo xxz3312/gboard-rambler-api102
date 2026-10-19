@@ -469,6 +469,8 @@ public final class PixelBoardModule extends XposedModule {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
         RuntimeProbe.install(hostContext, loader);
         FeatureConfig.initialize(this);
+        GboardPixelIdentity.apply(context.getPackageName(), FeatureConfig.gboardPixelIdentity());
+        recordStatus(context, "GBOARD_IDENTITY", GboardPixelIdentity.details());
         recordStatus(context, "GBOARD_ATTACHED", "writingTools=" + FeatureConfig.writingTools()
                 + " v2Requested=" + FeatureConfig.writingToolsV2()
                 + " backend=" + FeatureConfig.writingToolsBackend());

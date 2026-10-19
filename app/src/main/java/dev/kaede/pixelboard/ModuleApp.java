@@ -39,6 +39,7 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
                     .putBoolean("writing_tools_v2", local.getBoolean("writing_tools_v2", false))
                     .putInt("writing_tools_backend", local.getInt("writing_tools_backend", 2) == 3 ? 3 : 2)
                     .putBoolean("v2_local_proofread", local.getBoolean("v2_local_proofread", false))
+                    .putBoolean("gboard_pixel_identity", local.getBoolean("gboard_pixel_identity", false))
                     .commit();
             Log.i(TAG, "Remote preferences sync=" + success);
         } catch (RuntimeException e) {
@@ -46,3 +47,4 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
         }
     }
 }
+

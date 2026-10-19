@@ -273,6 +273,37 @@ Version-bind live queries to the requesting app version, and invalidate stored
 query state when the explicit reload begins, preventing stale replies from being
 presented as the current query after an upgrade or process reload.
 
+## 0.1.18 Gboard-only Pixel identity experiment
+
+The `gboard_pixel_identity` switch defaults off and is effective only when both
+Writing Tools and V2 are requested. Remote preferences are synchronized through
+the existing framework service. Only the Gboard Application context invokes the
+identity override. The helper independently rejects every other package before
+reading or writing fields.
+
+The process-local profile changes only Build.MANUFACTURER, BRAND, MODEL, DEVICE
+and PRODUCT to Google/google/Pixel 9 Pro/caiman/caiman. It runs once the Gboard
+context is available, before the module installs feature hooks. Checks already
+cached by Gboard before this point are not refreshed. No global property writes,
+fingerprint changes, SoC/ABI emulation, device-config/model-label changes or
+attestation/authentication overrides are added. Other Gboard components reading
+these five fields also see the changed values.
+
+All original fields are read before mutation. Every write is read back; failure
+attempts restoration and reports whether that restoration was verified. Successful
+mutation is logged as GBOARD_IDENTITY pixelIdentity=APPLIED. Live probes check the
+five fields again and report DRIFTED or READBACK_FAILED if appropriate. This only
+verifies field values, not Pixel eligibility, model availability or inference.
+FAILED_PARTIAL requires restarting Gboard with the switch disabled. Changes to
+the switch always require a Gboard process restart; the module does not restore
+old values dynamically while other Gboard code may be reading them.
+
+To compare: keep backend=3 and local proofreading off, test once with the switch
+off, then enable it, restart target processes and repeat the same writing-tools
+request. Capture the live identity and actual V2_RESPONSE/V2_ASTREA_ERROR. An
+unchanged PERMISSION_DENIED is a negative result, not a reason to force READY.
+No verified non-Pixel V2 private-backend success is claimed by this experiment.
+
 ## 0.1.17 PCS foreground query
 
 Full LSPosed logs confirmed that 0.1.15 and 0.1.16 already initialized PCS,
@@ -316,4 +347,5 @@ metadata above the rolling event history. These are timestamped historical recor
 with PIDs, not a claim that a backend process is currently alive.
 
 The explicit Root reload report now records before/after PIDs for each of the three targets, rather than only Gboard, so an exit code cannot conceal an unchanged PCS process.
+
 

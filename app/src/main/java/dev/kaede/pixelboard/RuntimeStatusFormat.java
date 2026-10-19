@@ -8,7 +8,7 @@ import java.util.Set;
 public final class RuntimeStatusFormat {
     private RuntimeStatusFormat() {}
     private static final Set<String> EVENTS = new HashSet<>(Arrays.asList(
-            "ASTREA_ATTESTATION", "V2_ASTREA_ERROR", "RUNTIME_ALIVE", "CHANNEL_TEST", "GBOARD_ATTACHED", "INIT_FAILED", "FLAGS_READY", "FLAGS_FAILED",
+            "GBOARD_IDENTITY", "ASTREA_ATTESTATION", "V2_ASTREA_ERROR", "RUNTIME_ALIVE", "CHANNEL_TEST", "GBOARD_ATTACHED", "INIT_FAILED", "FLAGS_READY", "FLAGS_FAILED",
             "MODE", "STATE", "BACKEND_PACKAGE", "ASTREA_FLAG", "MANIFEST_REQUEST",
             "V2_PROFILE_FAILED", "V2_DIAGNOSTICS_READY", "V2_DIAGNOSTICS_FAILED",
             "V2_ROUTE", "V2_SESSION_REQUEST", "V2_SESSION_READY", "V2_SESSION_FAILED",
@@ -34,3 +34,4 @@ public final class RuntimeStatusFormat {
         return String.join("\n", Arrays.copyOfRange(lines, Math.max(0, lines.length - 40), lines.length));
     }
 }
+
