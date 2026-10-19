@@ -68,6 +68,6 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: AICore-SM8850-SystemApp-0.1.0-INSTALL-DIRECTLY
+          name: AICore-SM8850-SystemApp-0.1.1-INSTALL-DIRECTLY
           path: experiments/aicore-system-app/root-module/
           if-no-files-found: error

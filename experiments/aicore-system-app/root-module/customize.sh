@@ -12,8 +12,9 @@ ui_print "- Destination is product/app, not priv-app"
 ui_print "- Requires systemless mounting and reboot"
 
 paths_file="$TMPDIR/pixelboard_aicore_paths.txt"
-pm path --user 0 com.google.android.aicore > "$paths_file" || abort "Cannot query installed AICore."
-[ -s "$paths_file" ] || abort "AICore is not installed for user 0."
+. "$MODPATH/resolve-apks.sh"
+resolve_aicore_apks
+[ -s "$paths_file" ] || abort "No AICore APK paths resolved."
 target_dir="$MODPATH/system/product/app/PixelBoardAiCore"
 mkdir -p "$target_dir" || abort "Cannot create staged module directory."
 base_seen=false

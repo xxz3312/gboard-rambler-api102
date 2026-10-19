@@ -1,6 +1,6 @@
 # AICore ordinary system-app experiment for SM8850
 
-Install the `AICore-SM8850-SystemApp-0.1.0-INSTALL-DIRECTLY` artifact ZIP directly
+Install the `AICore-SM8850-SystemApp-0.1.1-INSTALL-DIRECTLY` artifact ZIP directly
 in KernelSU, then reboot. Keep the separate feature-declaration module enabled.
 Use the root manager's existing systemless mounting provider. No AICore APK is
 redistributed in this ZIP: installation snapshots the already installed app.
@@ -48,3 +48,11 @@ have not yet been verified on the user's device.
 
 Reference:
 https://android.googlesource.com/platform/frameworks/base/+/android17-release/core/res/AndroidManifest.xml
+
+## 0.1.1 path lookup fix
+
+Uses the absolute native `/system/bin/cmd package path` entry point instead of
+the Java `pm` wrapper. If that query fails, scans only the two standard data-app
+layouts for the exact AICore package directory. No directory or more than one
+directory aborts. Every base/split hash and the mandatory arm64 split are still
+verified; the fallback does not relax version pins or search other packages.

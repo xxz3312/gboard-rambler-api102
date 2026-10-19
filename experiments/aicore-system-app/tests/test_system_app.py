@@ -17,8 +17,8 @@ class SystemAppInstallerTest(unittest.TestCase):
         self.work = Path(self.temp.name)
         self.module = self.work / 'module'
         shutil.copytree(ROOT, self.module)
-        self.source = self.work / 'installed'
-        self.source.mkdir()
+        self.source = self.work / 'data/app/encoded/com.google.android.aicore-test'
+        self.source.mkdir(parents=True)
         self.files = ['base.apk', 'split_config.arm64_v8a.apk', 'split_config.en.apk']
         pins = []
         for name in self.files:
@@ -33,12 +33,21 @@ class SystemAppInstallerTest(unittest.TestCase):
         (self.module / 'apk-sha256.txt').write_text('\n'.join(pins) + '\n')
         self.listing = self.work / 'paths'
         self.write_listing()
+        self.fake_cmd = self.work / 'cmd'
+        self.fake_cmd.write_text('''#!/bin/sh
+if [ "$TEST_CMD_FAIL" = true ]; then echo "fixture Binder query failure" >&2; exit 1; fi
+cat "$TEST_PATHS"
+''')
+        self.fake_cmd.chmod(0o755)
+        helper = self.module / 'resolve-apks.sh'
+        helper.write_text(helper.read_text().replace('/system/bin/cmd', str(self.fake_cmd))
+                          .replace('/data/app', str(self.work / 'data/app')))
 
     def write_listing(self):
         self.listing.write_text(''.join('package:' + str(self.source / name) + '\n'
                                        for name in self.files))
 
-    def install(self, soc='SM8850', sdk='37', boot='true'):
+    def install(self, soc='SM8850', sdk='37', boot='true', query_fail=False):
         shim = '''
 getprop() {
  case "$1" in
@@ -46,7 +55,6 @@ getprop() {
   ro.build.version.sdk) printf '%s' "$TEST_SDK" ;;
  esac
 }
-pm() { cat "$TEST_PATHS"; }
 abort() { echo "$1"; exit 1; }
 ui_print() { echo "$1"; }
 set_perm_recursive() { :; }
@@ -56,6 +64,7 @@ set_perm() { :; }
         return subprocess.run(['sh', '-c', shim], capture_output=True, text=True,
                               env={**os.environ, 'MODPATH': str(self.module),
                                    'TMPDIR': str(self.work), 'TEST_PATHS': str(self.listing),
+                                   'TEST_CMD_FAIL': str(query_fail).lower(),
                                    'TEST_SOC': soc, 'TEST_SDK': sdk, 'BOOTMODE': boot})
 
     def test_complete_snapshot_and_originals_preserved(self):
@@ -73,6 +82,25 @@ set_perm() { :; }
     def test_rejects_changed_apk(self):
         (self.source / 'base.apk').write_bytes(b'wrong version')
         self.assertNotEqual(self.install().returncode, 0)
+
+    def test_query_failure_uses_pinned_single_directory(self):
+        result = self.install(query_fail=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((self.module / 'system/product/app/PixelBoardAiCore/base.apk').exists())
+
+    def test_query_failure_still_rejects_wrong_hash(self):
+        (self.source / 'base.apk').write_bytes(b'wrong version')
+        self.assertNotEqual(self.install(query_fail=True).returncode, 0)
+
+    def test_query_failure_rejects_multiple_package_directories(self):
+        other = self.work / 'data/app/other/com.google.android.aicore-old'
+        other.mkdir(parents=True)
+        (other / 'base.apk').write_bytes(b'old APK')
+        self.assertNotEqual(self.install(query_fail=True).returncode, 0)
+
+    def test_query_failure_rejects_missing_package_directory(self):
+        shutil.rmtree(self.source)
+        self.assertNotEqual(self.install(query_fail=True).returncode, 0)
 
     def test_requires_arm64_split(self):
         self.files.remove('split_config.arm64_v8a.apk')
@@ -96,7 +124,7 @@ set_perm() { :; }
                 self.assertNotEqual(self.install(**args).returncode, 0)
 
     def test_shell_syntax_and_no_persistent_policy_changes(self):
-        for name in ('customize.sh', 'action.sh'):
+        for name in ('customize.sh', 'action.sh', 'resolve-apks.sh'):
             subprocess.run(['sh', '-n', str(ROOT / name)], check=True)
         for name in ('system.prop', 'sepolicy.rule', 'service.sh', 'post-fs-data.sh'):
             self.assertFalse((ROOT / name).exists())
