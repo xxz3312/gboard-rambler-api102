@@ -1,0 +1,33 @@
+name: Clean approved release attachments
+on:
+  push:
+    branches: [cleanup-release-assets]
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const plans=[{"id":417702042,"tag":"v0.1.29","assets":[{"id":657322183,"name":"R8-mapping.txt","digest":"sha256:2cd96e967096b4d30e9f8f73a7d8574da03a15eb1e8f7f8608fa75fee888de3b"},{"id":657322189,"name":"SHA256SUMS","digest":"sha256:f5b84c6a485abbfd3915b007acfbd7a7faa8660e182cec9cbe54fc1fdc14a895"},{"id":657322190,"name":"third-party-notices.zip","digest":"sha256:a0a06b5690c76b135dce2538cc5179cf9efab3a2b578f142e51e871fdc1044a1"}]},{"id":417239910,"tag":"v0.1.24-cloud-stable","assets":[{"id":656148945,"name":"R8-mapping.txt","digest":"sha256:c6489c9bd047af47fd9f793fd2436be8bc3214d60882bfbfae103bbabc798387"},{"id":656148941,"name":"SHA256SUMS","digest":"sha256:956cca9eddedf3baf3dd0ada276bb9d1483d153a075d8f74ef115e53034b8e06"},{"id":656148940,"name":"third-party-notices.zip","digest":"sha256:7bc619aacdded12d035df10895e8d792d27618e3659ea8271dd225490a47dee6"}]}];
+            for(const plan of plans) {
+              const {data:r}=await github.rest.repos.getRelease({owner:context.repo.owner,repo:context.repo.repo,release_id:plan.id});
+              if(r.tag_name!==plan.tag) throw new Error("Release identity mismatch");
+              for(const asset of plan.assets) {
+                const found=r.assets.find(a=>a.id===asset.id);
+                if(!found||found.name!==asset.name||found.name.endsWith(".apk")) throw new Error("Asset identity mismatch");
+              }
+            }
+            for(const plan of plans) for(const asset of plan.assets) {
+              await github.rest.repos.deleteReleaseAsset({owner:context.repo.owner,repo:context.repo.repo,asset_id:asset.id});
+              core.info("Removed "+plan.tag+"/"+asset.name);
+            }
+            await github.rest.repos.updateRelease({owner:context.repo.owner,repo:context.repo.repo,release_id:417702042,body:"移除多余的行内拼写检查开关及 Hook，清理旧设置。调整写作工具 Hook 初始化时机，并改为通过稳定字符串、调用关系与完整签名自动定位；无法找到唯一 Hook 点时，在模块界面红字显示“不支持该版本 Gboard”。\n\n保留 Rambler、基础云端校对与改写、Material 3 和隐藏桌面图标功能。本版不包含 AICore/PCS 私有后端实验。\n\n验证：单元测试、Debug 构建、启用 R8 与资源裁剪的 Release 构建、APK 签名及模块入口检查均通过。写作工具是否恢复可用仍待实机确认，不能将构建成功视为云端推理成功。\n\n安装后请在 LSPosed 中启用模块并选择 Gboard，打开所需功能开关，然后强制停止并重新唤起 Gboard。若提示签名冲突，需要卸载旧模块后安装，模块设置会清除；无需清除 Gboard 数据。\n\nAPK SHA-256：`023a89b3f5a5223001718f06d79f746b3f4b6badb4d1ccb33f8182db6e951d4c`\n"});
+            for(const plan of plans) {
+              const {data:r}=await github.rest.repos.getRelease({owner:context.repo.owner,repo:context.repo.repo,release_id:plan.id});
+              if(r.assets.some(a=>!a.name.endsWith(".apk"))) throw new Error("Unexpected remaining attachment");
+              core.info(plan.tag+": APK only; automatic source archives preserved");
+            }
+            
