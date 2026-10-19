@@ -51,3 +51,23 @@ jobs:
           path: experiments/aicore-features/root-module/
           if-no-files-found: error
 
+
+  aicore-system-app:
+    runs-on: ubuntu-latest
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test pinned system-app snapshot installer
+        run: python3 -m unittest discover -s experiments/aicore-system-app/tests -v
+      - name: Check direct-install module contents
+        run: |
+          test -f experiments/aicore-system-app/root-module/module.prop
+          test -f experiments/aicore-system-app/root-module/apk-sha256.txt
+          if find experiments/aicore-system-app/root-module -name '*.zip' -o -name '*.apk' | grep -q .; then
+            echo "Unexpected nested ZIP or redistributed APK"; exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AICore-SM8850-SystemApp-0.1.0-INSTALL-DIRECTLY
+          path: experiments/aicore-system-app/root-module/
+          if-no-files-found: error
