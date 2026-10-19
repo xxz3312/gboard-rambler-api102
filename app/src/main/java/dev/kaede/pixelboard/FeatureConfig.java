@@ -11,11 +11,13 @@ public final class FeatureConfig {
     private static volatile boolean rambler, spellchecker, diagnostics, writingTools, writingToolsV2, v2LocalProofread;
     private static volatile int writingToolsBackend = 2;
     private static volatile boolean gboardPixelIdentity;
+    private static volatile boolean localModelPreparation;
     private FeatureConfig() {}
     public static void initialize(XposedModule module) {
         rambler = spellchecker = diagnostics = writingTools = writingToolsV2 = v2LocalProofread = false;
         writingToolsBackend = 2;
         gboardPixelIdentity = false;
+        localModelPreparation = false;
         try {
             SharedPreferences p = module.getRemotePreferences(GROUP);
             rambler = p.getBoolean("rambler", false);
@@ -25,6 +27,7 @@ public final class FeatureConfig {
             writingToolsV2 = writingTools && p.getBoolean("writing_tools_v2", false);
             gboardPixelIdentity = writingToolsV2 && p.getBoolean("gboard_pixel_identity", false);
             v2LocalProofread = p.getBoolean("v2_local_proofread", false);
+            localModelPreparation = p.getBoolean("local_model_preparation", false);
             writingToolsBackend = p.getInt("writing_tools_backend", 2) == 3 ? 3 : 2;
             module.log(Log.INFO, TAG, "Remote settings read: rambler=" + rambler
                     + ", diagnostics=" + diagnostics + ", spellchecker=" + spellchecker
@@ -36,6 +39,7 @@ public final class FeatureConfig {
             module.log(Log.ERROR, TAG, "Remote settings unavailable; fail closed", e);
         }
     }
+    public static boolean localModelPreparation() { return localModelPreparation; }
     public static boolean rambler() { return rambler; }
     public static boolean spellchecker() { return spellchecker; }
     public static boolean diagnostics() { return diagnostics; }

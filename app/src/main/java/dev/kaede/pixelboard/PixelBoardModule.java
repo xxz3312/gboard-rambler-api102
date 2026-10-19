@@ -146,7 +146,16 @@ public final class PixelBoardModule extends XposedModule {
                     observeAstreaAttestation(loader, context);
                 WritingToolsBackendCheck.Result prerequisites = requested
                         ? WritingToolsBackendCheck.check(context, FeatureConfig.writingToolsBackend()) : null;
-                if (prerequisites != null && prerequisites.canAttempt) {
+                if (BackendPreparationPolicy.independentPcsPreparation(packageName,
+                        FeatureConfig.localModelPreparation())) {
+                    // Local Prompt model delivery does not depend on Gboard binding or V2 routing.
+                    recordStatus(context, "LOCAL_MODEL_PREPARATION", "requested=true v2=" + requested);
+                    try { installExperimentalBackend(packageName, loader, context); }
+                    catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                        recordStatus(context, "LOCAL_MODEL_PREPARATION_FAILED", e.getClass().getSimpleName());
+                        Log.w(TAG, "Independent PCS download configuration failed", e);
+                    }
+                } else if (prerequisites != null && prerequisites.canAttempt) {
                     try { installExperimentalBackend(packageName, loader, context); }
                     catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
                         recordStatus(context, "V2_DIAGNOSTICS_FAILED", "backend_install="

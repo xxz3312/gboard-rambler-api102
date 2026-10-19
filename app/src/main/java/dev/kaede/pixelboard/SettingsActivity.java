@@ -67,7 +67,11 @@ public final class SettingsActivity extends Activity {
         list.addView(backends);
         list.addView(prerequisites);
         addText(list, "实验作用域：Gboard、AICore、Private Compute Services。"
-                + "关闭 V2 时，不修改 AICore/Astrea。选择后端只改变请求路径，不代表模型、账号或服务已可用。", false);
+                + "V2 与下方模型下载准备分别控制。选择后端只改变请求路径，不代表模型、账号或服务已可用。", false);
+        addToggle(list, "local_model_preparation", "AICore 模型下载准备 · 独立实验",
+                "独立于 Gboard V2，供下方基础模型测试使用。开启 PCS 受保护下载配置，"
+                + "不强制模型可用；模型清单仍可能被拒绝。修改后点击重载目标进程。"
+                + "需将 Private Compute Services 纳入 LSPosed 作用域；下载可能产生流量。");
         android.widget.Button local = new android.widget.Button(this);
         local.setText("AICore 端侧执行 · 基础模型");
         local.setOnClickListener(v -> startActivity(new android.content.Intent(this, AiCoreLocalActivity.class)));

@@ -280,6 +280,9 @@ public final class AiCoreLocalActivity extends Activity {
                 + "\nAICore=" + version + "\nAICORE_QC="
                 + getPackageManager().hasSystemFeature("com.google.android.feature.AICORE_QC")
                 + " SM8850=" + getPackageManager().hasSystemFeature("com.google.android.feature.AICORE_QC_SM8850")
+                + "\n模型下载准备请求=" + getSharedPreferences("features", MODE_PRIVATE)
+                        .getBoolean("local_model_preparation", false)
+                + "（保存值，PCS 生效以 ASTREA_FLAG 日志为准）"
                 + "\n执行路径=ML Kit Prompt API（独立前台调用，无云端回退）";
     }
     private static String statusName(int status) {
