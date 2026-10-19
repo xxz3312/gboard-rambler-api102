@@ -147,7 +147,9 @@ public final class PixelBoardModule extends XposedModule {
                 WritingToolsBackendCheck.Result prerequisites = requested
                         ? WritingToolsBackendCheck.check(context, FeatureConfig.writingToolsBackend()) : null;
                 if (BackendPreparationPolicy.independentPcsPreparation(packageName,
-                        FeatureConfig.localModelPreparation())) {
+                        FeatureConfig.localModelPreparation())
+                        || (FeatureConfig.localModelPreparation()
+                            && "com.google.android.aicore".equals(packageName))) {
                     // Local Prompt model delivery does not depend on Gboard binding or V2 routing.
                     recordStatus(context, "LOCAL_MODEL_PREPARATION", "requested=true v2=" + requested);
                     try { installExperimentalBackend(packageName, loader, context); }
@@ -202,14 +204,16 @@ public final class PixelBoardModule extends XposedModule {
                     + binding.source + " target=" + binding.method.getDeclaringClass().getName()
                     + "." + binding.method.getName() + " version=" + pkg.getLongVersionCode());
         } else {
-            if (pkg.getLongVersionCode() != 526928L
-                    || !"0.release.qc8635.prod_aicore_20260917.00_RC01".equals(pkg.versionName)) {
-                Log.w(TAG, "V2 AICore version unsupported; manifest observer skipped");
+            AicoreManifestProfile profile = AicoreManifestProfile.forPackage(
+                    pkg.getLongVersionCode(), pkg.versionName);
+            if (profile == null) {
+                recordStatus(context, "MANIFEST_OBSERVER_UNSUPPORTED",
+                        "version=" + pkg.getLongVersionCode());
                 return;
             }
-            Method clientName = new TargetMethod("isz", "a", "java.lang.String").resolve(loader);
-            Method fetch = new TargetMethod("ity", "a", "java.lang.Object", "isz", "java.util.Map", "nrj")
-                    .resolve(loader);
+            Method clientName = new TargetMethod(profile.clientClass, "a", "java.lang.String").resolve(loader);
+            Method fetch = new TargetMethod(profile.fetchClass, "a", "java.lang.Object",
+                    profile.clientClass, "java.util.Map", profile.continuationClass).resolve(loader);
             AtomicInteger hits = new AtomicInteger();
             hook(fetch).intercept(chain -> {
                 try {
@@ -219,23 +223,17 @@ public final class PixelBoardModule extends XposedModule {
                                     .equals(clientName.invoke(chain.getArgs().get(0)))
                             && hits.incrementAndGet() <= 4) {
                         java.util.Map<?, ?> map = (java.util.Map<?, ?>) chain.getArgs().get(1);
-                        StringBuilder line = new StringBuilder("V2 AICore manifest labels (unchanged):");
-                        for (String key : new String[] {"build_id", "device_tier", "variant", "client_group"}) {
-                            Object value = map.get(key);
-                            String text = value instanceof String ? (String) value : "<absent>";
-                            line.append(" ").append(key).append("=").append(text.isEmpty() ? "<empty>"
-                                    : text.substring(0, Math.min(96, text.length()))
-                                            .replace((char) 10, ' ').replace((char) 13, ' '));
-                        }
-                        Log.i(TAG, line.toString());
-                        recordStatus(context, "MANIFEST_REQUEST", line.toString());
+                        String line = AicoreManifestProfile.describe(map);
+                        Log.i(TAG, line);
+                        recordStatus(context, "MANIFEST_REQUEST", line);
                     }
                 } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
                     Log.w(TAG, "V2 manifest observation failed; original request retained");
                 }
                 return chain.proceed();
             });
-            Log.i(TAG, "V2 AICore manifest observer installed; no label/build ID overrides");
+            recordStatus(context, "MANIFEST_OBSERVER_READY", "version=" + pkg.getLongVersionCode()
+                    + " target=" + profile.fetchClass + ".a read_only=true");
         }
     }
 
