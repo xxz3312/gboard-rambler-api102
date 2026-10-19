@@ -1,4 +1,4 @@
-name: Remove explicitly requested RC releases
+name: Remove all user-requested prereleases
 on:
   push:
     branches: [cleanup-rc-releases-20261020]
@@ -17,9 +17,12 @@ jobs:
             const repo = 'gboard-rambler-api102';
             const targets = [
               {id: 417296035, tag: 'v0.1.25-cloud-rc1'},
-              {id: 417303819, tag: 'v0.1.25-cloud-rc2'}
+              {id: 417303819, tag: 'v0.1.25-cloud-rc2'},
+              {id: 417338528, tag: 'v0.1.26-model-matrix'},
+              {id: 417425230, tag: 'v0.1.27-pcs-manifest'},
+              {id: 417444059, tag: 'v0.1.28-pcs-details'}
             ];
-            // Preflight both identities before deleting either release.
+            // Preflight all identities before deleting either release.
             const existing = [];
             for (const target of targets) {
               let release;
@@ -47,4 +50,4 @@ jobs:
                 throw new Error('Release still present: ' + target.tag);
               }
             }
-            core.info('Verified both requested RC releases are absent. Git tags and all other releases were preserved.');
+            core.info('Verified all five requested prereleases are absent. Git tags and all other releases were preserved.');
