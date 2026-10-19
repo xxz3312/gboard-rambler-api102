@@ -33,7 +33,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          cd artifact
+          cd artifact/dist
           sha256sum -c SHA256SUMS
           test -s Gboard-Rambler-API102-0.1.29.apk
           test -s third-party-notices.zip
