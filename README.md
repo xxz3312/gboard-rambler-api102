@@ -6,13 +6,13 @@
 
 ## 下载
 
-当前正式版：**[0.1.29](https://github.com/xxz3312/gboard-rambler-api102/releases/tag/v0.1.29)**。
+[前往 Release 下载](https://github.com/xxz3312/gboard-rambler-api102/releases/latest)
 
-- [下载 APK](https://github.com/xxz3312/gboard-rambler-api102/releases/download/v0.1.29/Gboard-Rambler-API102-0.1.29.apk)
-- [文件校验值](https://github.com/xxz3312/gboard-rambler-api102/releases/download/v0.1.29/SHA256SUMS)
-- [版本说明与其他附件](https://github.com/xxz3312/gboard-rambler-api102/releases/tag/v0.1.29)
+0.1.29 APK 的 SHA-256：
 
-版本号使用纯数字格式。普通 CI 仅构建和上传附件；Release 按维护者明确要求发布，不随提交自动发布。
+```text
+023a89b3f5a5223001718f06d79f746b3f4b6badb4d1ccb33f8182db6e951d4c
+```
 
 ## 功能范围
 
@@ -80,10 +80,10 @@ cd gboard-rambler-api102
 gradle :app:testDebugUnitTest :app:assembleRelease
 ```
 
-Release 构建启用 R8 代码裁剪与资源裁剪；发行附件同时提供 R8 映射、校验值与第三方许可声明。
+Release 构建启用 R8 代码裁剪与资源裁剪。Release 页面仅提供 APK 和对应源码下载。
 
 ## 许可与来源
 
-GPL-3.0。DexKit 等依赖的许可和来源说明随 APK 附带，见 `assets/licenses` 与第三方声明附件。仓库及发布附件不包含 Gboard、AICore、PCS 安装包或 Google 模型权重。
+GPL-3.0。DexKit 等依赖的许可和来源说明随 APK 附带，见 `assets/licenses` 和仓库中的 [第三方声明](THIRD_PARTY_NOTICES.md)。仓库及发布附件不包含 Gboard、AICore、PCS 安装包或 Google 模型权重。
 
 Google、Gboard、Pixel 等商标属于其权利人。本项目与 Google、上游作者及框架无隶属或背书关系。
