@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 28
-        versionName = "0.1.26-model-matrix"
+        versionCode = 29
+        versionName = "0.1.27-pcs-manifest"
     }
     buildFeatures { buildConfig = true }
     buildTypes {
@@ -29,3 +29,4 @@ dependencies { implementation("org.luckypray:dexkit:2.3.0"); compileOnly("io.git
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }
+

@@ -181,6 +181,7 @@ public final class PixelBoardModule extends XposedModule {
         try { pkg = context.getPackageManager().getPackageInfo(packageName, 0); }
         catch (android.content.pm.PackageManager.NameNotFoundException e) { return; }
         if ("com.google.android.as.oss".equals(packageName)) {
+            observePcsManifest149829(loader, context, pkg.getLongVersionCode());
             AstreaFlagResolver.Binding binding;
             try { binding = AstreaFlagResolver.resolve(context, loader); }
             catch (Exception | LinkageError e) {
@@ -235,6 +236,98 @@ public final class PixelBoardModule extends XposedModule {
             });
             recordStatus(context, "MANIFEST_OBSERVER_READY", "version=" + pkg.getLongVersionCode()
                     + " target=" + profile.fetchClass + ".a read_only=true");
+        }
+    }
+
+    private void observePcsManifest149829(ClassLoader loader, Context context, long version) {
+        if (version != 149829L) {
+            recordStatus(context, "MANIFEST_OBSERVER_UNSUPPORTED", "stage=pcs_remote version=" + version);
+            return;
+        }
+        try {
+            Class<?> request = Class.forName("hec", false, loader);
+            PcsManifestMetadata.Binding metadata = new PcsManifestMetadata.Binding(request,
+                    Class.forName("heh", false, loader), Class.forName("heg", false, loader),
+                    Class.forName("hea", false, loader), Class.forName("hef", false, loader),
+                    Class.forName("lqp", false, loader), Class.forName("heb", false, loader),
+                    Class.forName("hei", false, loader));
+            PcsRpcErrorMetadata.Binding errors = new PcsRpcErrorMetadata.Binding(
+                    Class.forName("mhu", false, loader), Class.forName("mhs", false, loader),
+                    Class.forName("mhp", false, loader), Class.forName("mfz", false, loader));
+            Class<?> futureClass = Class.forName("kmw", false, loader);
+            Method listener = futureClass.getMethod("c", Runnable.class, java.util.concurrent.Executor.class);
+            Method rpc = Class.forName("mzd", false, loader).getDeclaredMethod("a",
+                    Class.forName("mcl", false, loader), Object.class);
+            if (!java.lang.reflect.Modifier.isStatic(rpc.getModifiers())
+                    || rpc.getReturnType() != futureClass
+                    || !java.util.concurrent.Future.class.isAssignableFrom(futureClass)
+                    || listener.getReturnType() != void.class)
+                throw new NoSuchMethodException("PCS RPC signature mismatch");
+            rpc.setAccessible(true); listener.setAccessible(true);
+            AtomicInteger captures = new AtomicInteger();
+            hook(rpc).intercept(chain -> {
+                int observedId = 0;
+                try {
+                    if (captures.get() < 16 && chain.getArgs().size() == 2
+                            && request.isInstance(chain.getArgs().get(1))) {
+                        String line = metadata.describe(chain.getArgs().get(1));
+                        if (line != null) {
+                            observedId = captures.incrementAndGet();
+                            if (observedId <= 16) {
+                                Log.i(TAG, "PCS_MANIFEST_WIRE id=" + observedId + " " + line);
+                                recordStatus(context, "PCS_MANIFEST_WIRE", "id=" + observedId + " " + line);
+                            } else observedId = 0;
+                        }
+                    }
+                } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                    Log.w(TAG, "PCS manifest metadata unavailable; original request retained");
+                }
+                // Always invoke the real RPC exactly once. Do not wrap its exceptions.
+                Object result = chain.proceed();
+                final int requestId = observedId;
+                if (requestId != 0 && result instanceof java.util.concurrent.Future) {
+                    java.util.concurrent.Future<?> future = (java.util.concurrent.Future<?>) result;
+                    Runnable completion = () -> {
+                        if (!future.isDone()) return;
+                        String line;
+                        try {
+                            future.get(); // Listener runs only on completion; response body is never inspected.
+                            line = "rpc=OK response_body=not_inspected";
+                        } catch (java.util.concurrent.ExecutionException error) {
+                            try { line = errors.describe(error.getCause()); }
+                            catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                                line = "rpc=UNKNOWN error_metadata=unavailable";
+                            }
+                        } catch (java.util.concurrent.CancellationException error) {
+                            line = "rpc=CANCELLED";
+                        } catch (InterruptedException error) {
+                            Thread.currentThread().interrupt();
+                            line = "rpc=UNKNOWN observer=interrupted";
+                        } catch (RuntimeException | LinkageError error) {
+                            line = "rpc=UNKNOWN observer=failed";
+                        }
+                        try {
+                            Log.i(TAG, "PCS_MANIFEST_RESULT id=" + requestId + " " + line);
+                            recordStatus(context, "PCS_MANIFEST_RESULT", "id=" + requestId + " " + line);
+                        } catch (RuntimeException | LinkageError ignored) { }
+                    };
+                    try {
+                        listener.invoke(result, completion, (java.util.concurrent.Executor) Runnable::run);
+                    } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                        Log.w(TAG, "PCS RPC completion observer unavailable; original future retained");
+                    }
+                }
+                return result;
+            });
+            String ready = "stage=pcs_remote version=149829 read_only=true deviceConfigPermission="
+                    + (context.checkSelfPermission("android.permission.READ_DEVICE_CONFIG")
+                       == android.content.pm.PackageManager.PERMISSION_GRANTED);
+            Log.i(TAG, "MANIFEST_OBSERVER_READY " + ready);
+            recordStatus(context, "MANIFEST_OBSERVER_READY", ready);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+            String line = "stage=pcs_remote version=149829 error=" + error.getClass().getSimpleName();
+            Log.w(TAG, "MANIFEST_OBSERVER_UNSUPPORTED " + line);
+            recordStatus(context, "MANIFEST_OBSERVER_UNSUPPORTED", line);
         }
     }
 
@@ -739,3 +832,4 @@ public final class PixelBoardModule extends XposedModule {
         }
     }
 }
+
