@@ -40,7 +40,10 @@ public final class PixelBoardModule extends XposedModule {
                     Context appContext = (Context) arg;
                     if (GBOARD.equals(appContext.getPackageName())) {
                         try { initializeForGboard(loader, appContext); }
-                        catch (Throwable ex) { Log.e(TAG, "Gboard post-attach initialization failed", ex); }
+                        catch (Throwable ex) {
+                            CloudRuntimeStatus.send(appContext,"ERROR","initialization="+ex.getClass().getSimpleName());
+                            Log.e(TAG, "Gboard post-attach initialization failed", ex);
+                        }
                     } else {
                         bootstrapped.set(false);
                     }
@@ -77,9 +80,19 @@ public final class PixelBoardModule extends XposedModule {
                 +" writingTools="+FeatureConfig.writingTools()+" version="+gboardVersion(context));
         Log.i(TAG,"Compatibility rambler="+voiceCompatible+" writing="+writingCompatible
                 +" resolver="+resolved.source);
-        if (FeatureConfig.rambler()) installRambler(loader,resolved.voice);
+        boolean voiceInstalled=!FeatureConfig.rambler() || installRambler(loader,resolved.voice);
+        boolean getterInstalled=false;
         if ((FeatureConfig.rambler() || FeatureConfig.writingTools()) && resolved.flags!=null)
-            installFlagGetter(resolved.flags);
+            getterInstalled=installFlagGetter(resolved.flags);
+        CloudRuntimeStatus.send(hostContext,"HOOKS",
+                "ramblerRequested="+FeatureConfig.ramblerRequested()
+                +" writingRequested="+FeatureConfig.writingRequested()
+                +" ramblerInstalled="+(FeatureConfig.rambler() && voiceInstalled && getterInstalled)
+                +" writingInstalled="+(FeatureConfig.writingTools() && getterInstalled)
+                +" getterInstalled="+getterInstalled);
+        FeatureConfig.compatibility(
+                voiceCompatible && (!FeatureConfig.ramblerRequested() || voiceInstalled && getterInstalled),
+                writingCompatible && (!FeatureConfig.writingRequested() || getterInstalled));
         if (FeatureConfig.writingTools()) {
             WritingToolsDiagnostics.probe(loader);
             if (FeatureConfig.diagnostics() && verifiedWritingTools184) observeWritingTools184State(loader);
@@ -91,60 +104,63 @@ public final class PixelBoardModule extends XposedModule {
         catch (Exception e) { return "unknown"; }
     }
 
-    private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
+    private boolean installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
         Log.i(TAG, "Resolved selector signature family: " + profile.id);
-        hookScope(profile.layout, loader, false);
-        hookScope(profile.setup, loader, false);
-        hookScope(profile.create, loader, false);
-        hookScope(profile.defaults, loader, true);
-        observeSelectionRead(profile.read, loader);
-        observeSelectionWrite(profile.write, loader);
+        boolean installed=true;
+        installed &= hookScope(profile.layout, loader, false);
+        installed &= hookScope(profile.setup, loader, false);
+        installed &= hookScope(profile.create, loader, false);
+        installed &= hookScope(profile.defaults, loader, true);
+        installed &= observeSelectionRead(profile.read, loader);
+        installed &= observeSelectionWrite(profile.write, loader);
+        return installed;
     }
 
-    private void hookScope(TargetMethod target, ClassLoader loader, boolean defaults) {
+    private boolean hookScope(TargetMethod target, ClassLoader loader, boolean defaults) {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 if (defaults) RamblerScope.enterDefault(); else RamblerScope.enterVoice();
                 try { return chain.proceed(); }
                 finally {
-                    if (defaults) RamblerScope.exitDefault();
-                    else RamblerScope.exitVoice();
+                    if (defaults) RamblerScope.exitDefault(); else RamblerScope.exitVoice();
                 }
             });
+            return true;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
             Log.w(TAG, "Scope hook skipped: " + target, e);
+            return false;
         }
     }
 
-    private void observeSelectionRead(TargetMethod target, ClassLoader loader) {
+    private boolean observeSelectionRead(TargetMethod target, ClassLoader loader) {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
-                if (result instanceof Boolean) {
-                    // Use host-owned Context rather than trusting a foreign caller.
-                    RamblerSelection.observe((Boolean) result, GboardContext.current());
-                }
+                if (result instanceof Boolean) RamblerSelection.observe((Boolean) result, hostContext);
                 return result;
             });
+            return true;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
             Log.w(TAG, "Selection read observer skipped: " + target, e);
+            return false;
         }
     }
 
-    private void observeSelectionWrite(TargetMethod target, ClassLoader loader) {
+    private boolean observeSelectionWrite(TargetMethod target, ClassLoader loader) {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
-                if (FeatureConfig.diagnostics())
-                    Log.d(TAG, "Official selector write completed (no forced selection)");
+                if (FeatureConfig.diagnostics()) Log.d(TAG, "Official selector write completed (no forced selection)");
                 return result;
             });
+            return true;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
             Log.w(TAG, "Selection write observer skipped: " + target, e);
+            return false;
         }
     }
 
-    private void installFlagGetter(RamblerFlagBindings.Binding binding) {
+    private boolean installFlagGetter(RamblerFlagBindings.Binding binding) {
         try {
             hook(binding.getter).intercept(chain -> {
                 Object original = chain.proceed();
@@ -181,8 +197,10 @@ public final class PixelBoardModule extends XposedModule {
             CloudRuntimeStatus.send(hostContext, "GETTER", "installed profile=" + binding.profile);
             Log.i(TAG, "Installed shared guarded Rambler/WritingTools flag policy: " + binding.owner
                     + " / profile=" + binding.profile);
+            return true;
         } catch (RuntimeException | LinkageError e) {
             Log.w(TAG, "Flag getter hook skipped", e);
+            return false;
         }
     }
 

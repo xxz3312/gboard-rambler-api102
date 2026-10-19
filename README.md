@@ -5,7 +5,7 @@
 采用 GPL-3.0；完整声明见 [LICENSE](LICENSE)、[NOTICE](NOTICE) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ## 下载与功能
-[GitHub Releases](https://github.com/xxz3312/gboard-rambler-api102/releases) 提供历史稳定功能快照与 **0.1.25-cloud-rc1 候选包**。
+[GitHub Releases](https://github.com/xxz3312/gboard-rambler-api102/releases) 提供历史稳定功能快照与 **0.1.25-cloud-rc2 候选包**。
 0.1.24 已收到写作工具不可用反馈，请勿将其视为实机验证通过的发布构建。
 原始功能依据为
 基于已实测的 0.1.7：Rambler 与基础云端写作工具。

@@ -53,7 +53,7 @@ public final class SettingsActivity extends AppCompatActivity {
             return insets;
         });
         text(list, "Gboard Rambler", com.google.android.material.R.style.TextAppearance_Material3_HeadlineLarge);
-        text(list, "API 102 · 0.1.25-cloud-rc1", com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
+        text(list, "API 102 · 0.1.25-cloud-rc2", com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
         info(list, "修复候选版", "基于 0.1.7 的基础云端路径。修改开关后需重启 Gboard。0.1.24 已收到不可用反馈；本版需要实机复验。");
         section(list, "功能");
         toggle(list, "rambler", "Rambler", "实验功能；原版路径已在用户设备验证。", false);

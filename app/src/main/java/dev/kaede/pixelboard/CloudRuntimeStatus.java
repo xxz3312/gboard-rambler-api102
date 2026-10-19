@@ -7,7 +7,7 @@ import android.os.Process;
 
 /** Metadata only. Receiving app authenticates the sender through Android 14+ identity. */
 public final class CloudRuntimeStatus extends BroadcastReceiver {
-    public static final String VERSION="0.1.25-cloud-rc1";
+    public static final String VERSION="0.1.25-cloud-rc2";
     private static final String PREF="cloud_runtime_status";
     public static void send(Context context,String event,String detail) {
         if(context==null||Build.VERSION.SDK_INT<34)return;
@@ -27,7 +27,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
             int uid=context.getPackageManager().getPackageUid("com.google.android.inputmethod.latin",0);
             if(uid!=getSentFromUid()||!VERSION.equals(intent.getStringExtra("version")))return;
             String event=intent.getStringExtra("event");
-            if(!"COMPAT".equals(event)&&!"INIT".equals(event)&&!"GETTER".equals(event)&&!"FLAG".equals(event))return;
+            if(!"COMPAT".equals(event)&&!"INIT".equals(event)&&!"GETTER".equals(event)&&!"FLAG".equals(event)&&!"HOOKS".equals(event)&&!"ERROR".equals(event))return;
             String detail=intent.getStringExtra("detail");
             if(detail==null||detail.length()>480)return;
             android.content.SharedPreferences prefs=context.getSharedPreferences(PREF,0);
@@ -36,14 +36,23 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
             if(pid<1)return;
             // New process cannot inherit a previous process's getter or flag status.
             if("COMPAT".equals(event))edit.clear();
-            else if(pid!=prefs.getInt("pid",-1))return;
+            else if(pid!=prefs.getInt("pid",-1)) {
+                if(!"ERROR".equals(event))return;
+                edit.clear();
+            }
             edit.putInt("pid",pid).putString("version",VERSION)
                     .putString(event,detail).putLong(event+"_when",intent.getLongExtra("when",0)).apply();
         } catch(Exception ignored) {}
     }
     public static boolean unsupported(Context context) {
         android.content.SharedPreferences p=context.getSharedPreferences(PREF,0);
-        return VERSION.equals(p.getString("version","")) && p.getString("COMPAT","").contains("false");
+        return VERSION.equals(p.getString("version","")) && (
+                p.getString("COMPAT","").contains("false") || !p.getString("ERROR","").isEmpty()
+                || installationFailed(p.getString("HOOKS","")));
+    }
+    static boolean installationFailed(String hooks) {
+        return hooks.contains("ramblerRequested=true") && hooks.contains("ramblerInstalled=false")
+                || hooks.contains("writingRequested=true") && hooks.contains("writingInstalled=false");
     }
     public static String report(Context context) {
         android.content.SharedPreferences p=context.getSharedPreferences(PREF,0);
@@ -52,9 +61,14 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
         StringBuilder out=new StringBuilder();
         if(capability.contains("rambler=false"))out.append("不支持该版本 Gboard：Rambler 未找到唯一匹配的 Hook 点。\n");
         if(capability.contains("writing=false"))out.append("不支持该版本 Gboard：写作工具未找到唯一匹配的 Hook 点。\n");
-        if(!capability.contains("false"))out.append("Rambler／写作工具定位成功；云端功能仍需实际操作验证。\n");
+        String hooks=p.getString("HOOKS","");
+        String error=p.getString("ERROR","");
+        if(!error.isEmpty())out.append("模块初始化失败；请查看 ERROR，不能据此判断后端可用性。\n");
+        else if(installationFailed(hooks))out.append("Hook 安装未完成；已开启功能尚未成功安装全部 Hook。\n");
+        else if(hooks.isEmpty())out.append("等待 Hook 安装结果；定位成功不等于已安装。\n");
+        else if(!capability.contains("false"))out.append("Hook 安装检查完成；云端功能仍需实际操作验证。\n");
         out.append("Gboard PID=").append(p.getInt("pid",-1)).append("\n");
-        for(String event:new String[]{"COMPAT","INIT","GETTER","FLAG"}) {
+        for(String event:new String[]{"COMPAT","INIT","GETTER","HOOKS","ERROR","FLAG"}) {
             String detail=p.getString(event,"");
             if(!detail.isEmpty()) {
                 long time=p.getLong(event+"_when",0);
