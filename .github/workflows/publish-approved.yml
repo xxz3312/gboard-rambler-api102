@@ -1,0 +1,55 @@
+name: Publish approved 0.1.29
+on:
+  push:
+    branches: [publish-0.1.29-approved]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify approved build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh api repos/xxz3312/gboard-rambler-api102/actions/runs/39316605438 > run.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open("run.json"))
+          assert r["head_sha"]=="621f1b4592afdddded2957b13269e8f9b503d673"
+          assert r["status"]=="completed" and r["conclusion"]=="success"
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: Gboard-Rambler-0.1.29
+          path: artifact
+          github-token: ${{ github.token }}
+          repository: xxz3312/gboard-rambler-api102
+          run-id: 39316605438
+      - name: Verify files and publish exact build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          cd artifact
+          sha256sum -c SHA256SUMS
+          test -s Gboard-Rambler-API102-0.1.29.apk
+          test -s third-party-notices.zip
+          test -s R8-mapping.txt
+          cat > release-notes.md <<'NOTES'
+          移除多余的行内拼写检查开关及 Hook，清理旧设置。调整写作工具 Hook 初始化时机，并改为通过稳定字符串、调用关系与完整签名自动定位；无法找到唯一 Hook 点时，在模块界面红字显示“不支持该版本 Gboard”。
+          
+          保留 Rambler、基础云端校对与改写、Material 3 和隐藏桌面图标功能。本版不包含 AICore/PCS 私有后端实验。
+          
+          验证：单元测试、Debug 构建、启用 R8 与资源裁剪的 Release 构建、APK 签名及模块入口检查均通过。写作工具是否恢复可用仍待实机确认，不能将构建成功视为云端推理成功。
+          
+          安装后请在 LSPosed 中启用模块并选择 Gboard，打开所需功能开关，然后强制停止并重新唤起 Gboard。若提示签名冲突，需要卸载旧模块后安装，模块设置会清除；无需清除 Gboard 数据。
+          
+          仅按本次明确要求发布 0.1.29，普通 CI 构建不会自动创建 Release。
+          NOTES
+          gh release create v0.1.29 --repo xxz3312/gboard-rambler-api102 \
+            --target 621f1b4592afdddded2957b13269e8f9b503d673 \
+            --title "0.1.29" --latest --notes-file release-notes.md \
+            Gboard-Rambler-API102-0.1.29.apk third-party-notices.zip R8-mapping.txt SHA256SUMS
