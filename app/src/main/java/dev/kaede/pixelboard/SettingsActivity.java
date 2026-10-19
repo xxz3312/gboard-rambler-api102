@@ -75,8 +75,6 @@ public final class SettingsActivity extends AppCompatActivity {
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
         boolean light = ColorUtils.calculateLuminance(surface) > 0.5;
-        WindowCompat.getInsetsController(getWindow(), root).setAppearanceLightStatusBars(light);
-        WindowCompat.getInsetsController(getWindow(), root).setAppearanceLightNavigationBars(light);
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(
                     WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
@@ -163,6 +161,11 @@ public final class SettingsActivity extends AppCompatActivity {
                         .setMessage("版本 " + CloudRuntimeStatus.VERSION + " · API 102\n维护：Kaede\n\n基于 Akshayykadam/PixelBoard，采用 GPL-3.0。完整许可与署名随 APK 的 assets/licenses 提供。本项目非 Google 官方组件。")
                         .setPositiveButton("关闭", null).show());
         setContentView(root);
+        // PhoneWindow creates its DecorView during setContentView; do not query its controller earlier.
+        androidx.core.view.WindowInsetsControllerCompat systemBars =
+                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        systemBars.setAppearanceLightStatusBars(light);
+        systemBars.setAppearanceLightNavigationBars(light);
         ViewCompat.requestApplyInsets(root);
         refreshStatus();
     }
