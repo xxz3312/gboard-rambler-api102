@@ -7,7 +7,7 @@ import android.os.Process;
 
 /** Metadata only. Receiving app authenticates the sender through Android 14+ identity. */
 public final class CloudRuntimeStatus extends BroadcastReceiver {
-    public static final String VERSION="0.1.29";
+    public static final String VERSION="0.1.30";
     private static final String PREF="cloud_runtime_status";
     public static void send(Context context,String event,String detail) {
         if(context==null||Build.VERSION.SDK_INT<34)return;
