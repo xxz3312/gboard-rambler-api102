@@ -1,17 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="com.google.android.apps.aicore.service.BIND_SERVICE"/>
-    <queries>
-        <package android:name="com.google.android.aicore"/>
-    </queries>
     <application android:name=".ModuleApp" android:label="Gboard Rambler API102"
+        android:theme="@style/Theme.PixelBoard"
         android:description="@string/module_description" android:allowBackup="false">
-        <activity android:name=".AiCoreProbeActivity" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS"/>
+            </intent-filter>
+        </activity>
+        <activity-alias android:name=".Launcher" android:targetActivity=".SettingsActivity"
+            android:enabled="true" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity>
+        </activity-alias>
         <provider android:name="io.github.libxposed.service.XposedProvider"
             android:authorities="${applicationId}.XposedService" android:exported="true"/>
     </application>
