@@ -1,0 +1,45 @@
+name: Publish approved 0.1.30
+on:
+  push:
+    branches: [publish-0.1.30-approved]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for approved build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh run watch 39325616719 --repo xxz3312/gboard-rambler-api102 --exit-status --interval 15 > build-watch.log
+          gh api repos/xxz3312/gboard-rambler-api102/actions/runs/39325616719 > run.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open("run.json"))
+          assert r["head_sha"]=="2e3776529e5cf902765c0647ad8f2647fb8c16af"
+          assert r["status"]=="completed" and r["conclusion"]=="success"
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: Gboard-Rambler-0.1.30
+          path: artifact
+          github-token: ${{ github.token }}
+          repository: xxz3312/gboard-rambler-api102
+          run-id: 39325616719
+      - name: Verify and publish APK only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          cd artifact/dist
+          sha256sum -c SHA256SUMS
+          test -s Gboard-Rambler-API102-0.1.30.apk
+          cat > release-notes.md <<'NOTES'
+          优化 Material 3 设置布局，精简信息展示并统一图标与分组。修复设置界面启动闪退。
+          NOTES
+          gh release create v0.1.30 --repo xxz3312/gboard-rambler-api102 \
+            --target 2e3776529e5cf902765c0647ad8f2647fb8c16af --title "0.1.30" --latest --notes-file release-notes.md \
+            Gboard-Rambler-API102-0.1.30.apk
