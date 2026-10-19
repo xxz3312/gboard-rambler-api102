@@ -6,7 +6,7 @@ import urllib.request
 report = pathlib.Path("dependencies.txt").read_text()
 coordinates = set()
 for line in report.splitlines():
-    match = re.search(r"(?:[+\\]---) ([\\w.\\-]+):([\\w.\\-]+):([^\\s:]+)(?: -> ([^\\s]+))?", line)
+    match = re.search(r"(?:[+\\]---) ([\w.\-]+):([\w.\-]+):([^\s:]+)(?: -> ([^\s]+))?", line)
     if match:
         group, artifact, version, selected = match.groups()
         if selected and ":" not in selected:

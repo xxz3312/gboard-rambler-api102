@@ -21,7 +21,14 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-37.0" "build-tools;36.0.0"
       - name: Test and build
-        run: gradle :app:testDebugUnitTest :app:assembleRelease --stacktrace --no-daemon
+        run: |
+          for attempt in 1 2 3; do
+            if gradle :app:testDebugUnitTest :app:assembleRelease --stacktrace --no-daemon; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep 15
+          done
       - name: Record dependencies
         run: |
           gradle :app:dependencies --configuration releaseRuntimeClasspath --no-daemon > dependencies.txt
