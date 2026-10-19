@@ -1,8 +1,5 @@
 <resources>
     <style name="Theme.PixelBoard" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">#4F6357</item>
-        <item name="colorSecondary">#526459</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

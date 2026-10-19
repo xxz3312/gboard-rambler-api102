@@ -5,15 +5,19 @@
 采用 GPL-3.0；完整声明见 [LICENSE](LICENSE)、[NOTICE](NOTICE) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ## 下载与功能
-[GitHub Releases](https://github.com/xxz3312/gboard-rambler-api102/releases) 提供 **0.1.24-cloud-stable**，
+[GitHub Releases](https://github.com/xxz3312/gboard-rambler-api102/releases) 提供历史稳定功能快照与 **0.1.25-cloud-rc1 候选包**。
+0.1.24 已收到写作工具不可用反馈，请勿将其视为实机验证通过的发布构建。
+原始功能依据为
 基于已实测的 0.1.7：Rambler 与基础云端写作工具。
 Writing Tools V2 私有后端、AICore/PCS、本地模型下载与 Pixel 伪装不属于该发布版。
 云端入口和英语校对在用户设备上实测可用；其他语言、功能与设备不承诺全部可用。
-R8 发布构建尚需实机复验。
+R8 发布构建仍需实机复验。候选版使用语义自动定位并保留完整签名兼容路径；未知或歧义目标不安装 Hook。
+界面会分别报告 Rambler 和写作工具的适配结果，无法定位时红字提示“不支持该版本 Gboard”。
+未收到本版运行事件不会直接判定不支持。
 
 ## 使用
 需要支持 libxposed API 102 的框架与官方 Gboard。
-已验证目标为 Gboard 18.4.1.985164140-release-arm64-v8a（176027078）。
+0.1.7 的已验证目标为 Gboard 18.4.1.985164140-release-arm64-v8a（176027078）。
 安装模块，在 LSPosed 中只勾选 Gboard，按需开启 Rambler／AI 写作工具，强制停止并重新打开 Gboard。
 先在普通便签中用英语测试；Gboard 的服务同意、账号限制和应用排除策略仍然有效。
 不要把本模块当作无需联网的 Gemini Nano 移植。
@@ -29,6 +33,13 @@ JDK 17、Gradle 9.4.1、Android SDK 37.0。
 Release 使用 R8 和资源裁剪。签名方式、兼容性和验证范围见 [发布说明](RELEASE_NOTES.md)。
 仓库及发布附件不包含 Gboard/AICore/PCS APK 或 Google 模型权重。
 Google/Gboard/Pixel 等商标属于其权利人，本项目与 Google、上游作者及框架无隶属或背书关系。
+
+## 运行状态
+已移除未验证的行内拼写检查 Hook 和开关，并在同步时清理遗留配置。
+设置页显示 LSPosed 配置同步结果及经系统发送者身份验证的 Gboard 运行元数据。
+“定位成功”只代表结构匹配，无法保证云端请求成功；不代表自动支持所有未来版本。
+首次解析可能进行 DEX 扫描；缓存随 APK 更新失效。Android 14 以下请用 Logcat 验证。
+Root 重启按钮仅在用户点击并确认后停止 Gboard，不自动申请 Root。
 
 ## 界面与桌面图标
 Material 3 界面跟随系统深浅色，Android 12+ 使用动态配色。

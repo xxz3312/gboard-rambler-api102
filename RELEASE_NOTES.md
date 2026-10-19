@@ -1,29 +1,26 @@
-# 0.1.24-cloud-stable
+# 0.1.25-cloud-rc1
 
-基于实机验证过的 0.1.7-cloud-entry（32908286d9cae924ef637a988c291211d8bfff73）整理的稳定功能快照。
+修复候选版，尚未获得实机成功结果。
 
-- 新增 Material 3 界面、深浅色与 Android 12+ 动态配色，新增隐藏桌面图标开关；保留 LSPosed 设置入口与 ADB 恢复方式。
-- 保留原版 Rambler 选择与特性开关逻辑。
-- 保留基础云端 Writing Tools；用户已确认入口与英语校对返回文本。
-- 此版明确关闭 Writing Tools V2 私有后端、混合推理和端侧校对。
-- 不包含 AICore/PCS Hook、Pixel 伪装、模型准备或下载实验。
-- 移除未使用的 AICore 检测组件和 ML Kit SDK；补齐 GPL-3.0 许可、来源署名与第三方声明。
-- Release 构建启用 R8 与资源裁剪；运行单元测试并验证 APK 签名及 API 102 入口资源。
+- 移除独立的行内拼写检查开关与 Hook；清理本地和远程遗留的 spellchecker 开启状态。
+- 保留 Rambler、基础云端写作工具、Material 3 和隐藏桌面图标。
+- 新增基于稳定字符串、调用关系和完整签名的自动定位；缓存绑定在 APK 路径/大小/时间戳变化后失效，并重新验证描述符。
+- 保留已验证的完整签名映射作为兼容路径。候选为空或有歧义时不安装对应功能。
+- Rambler 与写作工具分别报告兼容性；找不到唯一 Hook 点时红字显示“不支持该版本 Gboard”。
+- 新增配置同步结果、经系统认证的 Gboard 运行元数据与用户主动 Root 重启按钮。无本版事件不等于不支持。
+- 移除基础云端入口对单个版本号的硬编码限制；适配状态只代表结构匹配，不保证 Google 云端服务返回成功。
+- 对 Hook、配置桥接和 DexKit JNI 使用保守保留规则；继续启用 R8 和资源裁剪。
+- CI 验证实际 APK 中的入口类、回调与状态组件，而非仅检查入口文本非空。
 
-## 安装
-需要支持 libxposed API 102 的 LSPosed 框架。Writing Tools 针对 Gboard
-18.4.1.985164140-release-arm64-v8a（176027078）适配；其他版本不承诺可用。
-仅勾选 Gboard 作用域。分别开启 Rambler 和 AI 写作工具，然后强制停止并重新唤起 Gboard。
-在普通便签中用英语测试，并完成 Gboard 原有同意流程；部分应用（包括 ChatGPT）受原应用排除策略限制。
-云端服务可能受网络、语言、地区、账号和 Google 服务端策略影响。
+0.1.24 已收到写作工具不可用反馈，根因尚未由实机日志确定，不能声称仅靠以上修改已解决。
+需支持 API 102 的框架。安装后开启模块开关，重启并唤起 Gboard，在模块界面查看实时状态。
+新版本 Gboard 首次启动可能进行 DEX 扫描；自动适配不保证覆盖所有未来版本。
+状态传输使用 Android 14+ 的系统发送者身份；更低版本仍可用 Logcat 检查。
 
-## 签名与验证范围
-本次 APK 使用 GitHub Actions 构建时生成的测试签名，不是固定生产签名。
-与已有测试 APK 签名不保证一致；若 Android 提示签名冲突，需要卸载旧模块再安装，
-卸载会清除该模块设置，不需要卸载 Gboard。后续长期更新应配置固定私有签名。
-发布构建的 R8/打包结果经过 CI 检查；R8 版本尚需实机复验，不能把 CI 通过视为云端服务保证。
+## 签名
+仍使用 CI 测试签名，不能保证与旧 APK 一致。签名冲突时需卸载旧模块再安装，模块配置会被清除。
+本候选版不会清理 Gboard、AICore 或 PCS 数据，也不包含 V2/AICore 私有后端。
 
-## 来源
-上游 PixelBoard：https://github.com/Akshayykadam/PixelBoard
-作者与许可见 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md。
-本仓库为独立运行时移植；不是 Google 官方组件。
+## 开源
+GPL-3.0，来源见 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md。
+DexKit 2.3.0 的 Java/Kotlin 层与核心许可、源码链接及替换说明随 APK 附带。

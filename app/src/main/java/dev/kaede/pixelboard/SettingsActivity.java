@@ -9,6 +9,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.google.android.material.button.MaterialButton;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -23,6 +24,20 @@ public final class SettingsActivity extends AppCompatActivity {
     private SharedPreferences prefs;
     private MaterialSwitch launcherSwitch;
     private boolean refreshingLauncher;
+    private Runnable statusRefresh;
+    private final android.os.Handler statusHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable statusTicker=new Runnable() {
+        @Override public void run() {
+            if(statusRefresh!=null)statusRefresh.run();
+            statusHandler.postDelayed(this,1000);
+        }
+    };
+    @Override protected void onResume() {
+        super.onResume(); statusHandler.removeCallbacks(statusTicker); statusHandler.post(statusTicker);
+    }
+    @Override protected void onPause() {
+        statusHandler.removeCallbacks(statusTicker); super.onPause();
+    }
     @Override protected void onCreate(Bundle state) {
         DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(state);
@@ -38,13 +53,12 @@ public final class SettingsActivity extends AppCompatActivity {
             return insets;
         });
         text(list, "Gboard Rambler", com.google.android.material.R.style.TextAppearance_Material3_HeadlineLarge);
-        text(list, "API 102 · 0.1.24-cloud-stable", com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
-        info(list, "稳定功能快照", "基于已验证的 0.1.7。修改功能开关后，请强制停止并重新打开 Gboard。此版使用基础云端写作工具。");
+        text(list, "API 102 · 0.1.25-cloud-rc1", com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
+        info(list, "修复候选版", "基于 0.1.7 的基础云端路径。修改开关后需重启 Gboard。0.1.24 已收到不可用反馈；本版需要实机复验。");
         section(list, "功能");
         toggle(list, "rambler", "Rambler", "实验功能；原版路径已在用户设备验证。", false);
-        toggle(list, "writing_tools", "AI 写作工具", "基础云端校对与改写。已验证入口及英语校对；需完成 Gboard 原有同意流程。", false);
-        section(list, "实验与诊断");
-        toggle(list, "spellchecker", "行内拼写检查", "实验功能，混淆方法映射仍需实机验证。", false);
+        toggle(list, "writing_tools", "AI 写作工具", "基础云端校对与改写。原 0.1.7 已验证英语校对，本候选版待复验；需完成 Gboard 同意流程。", false);
+        section(list, "诊断");
         toggle(list, "diagnostics", "诊断日志", "记录 Hook 状态。Logcat 标签：PixelBoardLS。", false);
         section(list, "外观");
         launcherSwitch = toggle(list, null, "隐藏桌面图标",
@@ -61,7 +75,53 @@ public final class SettingsActivity extends AppCompatActivity {
             } else setLauncherHidden(false);
         });
         section(list, "状态与来源");
-        info(list, "LSPosed", ModuleApp.connected() ? "服务已连接，配置已交给同步通道。" : "服务尚未连接。设置保存在本地，连接后重试同步。");
+        TextView runtime = text(list, "", com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+        Runnable refreshStatus = () -> {
+            runtime.setText(((ModuleApp) getApplication()).configurationStatus()
+                    + "\n\n" + CloudRuntimeStatus.report(this));
+            runtime.setTextColor(CloudRuntimeStatus.unsupported(this)
+                    ? com.google.android.material.color.MaterialColors.getColor(runtime,
+                        com.google.android.material.R.attr.colorError)
+                    : com.google.android.material.color.MaterialColors.getColor(runtime,
+                        com.google.android.material.R.attr.colorOnSurface));
+        };
+        statusRefresh=refreshStatus;
+        refreshStatus.run();
+        MaterialButton refresh = new MaterialButton(this);
+        refresh.setText("同步配置并刷新运行状态");
+        refresh.setOnClickListener(v -> {
+            ((ModuleApp) getApplication()).sync();
+            refreshStatus.run();
+        });
+        list.addView(refresh);
+        MaterialButton restart = new MaterialButton(this);
+        restart.setText("Root 重启 Gboard");
+        restart.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
+            .setTitle("重启 Gboard？")
+            .setMessage("将强制停止 Gboard；当前正在输入的未提交内容可能丢失。随后请手动唤起键盘。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("重启", (dialog, which) -> {
+                ((ModuleApp) getApplication()).sync();
+                restart.setEnabled(false);
+                new Thread(() -> {
+                    String result;
+                    try {
+                        java.lang.Process process = new ProcessBuilder("su", "-c",
+                                "am force-stop com.google.android.inputmethod.latin").start();
+                        boolean done = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS);
+                        if (!done) { process.destroy(); result = "Root 请求超时；可从系统设置强制停止 Gboard。"; }
+                        else result = process.exitValue() == 0
+                                ? "已发送停止请求，请唤起 Gboard 后刷新状态。"
+                                : "Root 停止失败；可从系统设置强制停止 Gboard。";
+                    } catch (Exception error) { result = "无法执行 Root 停止：" + error.getClass().getSimpleName(); }
+                    String message = result;
+                    runOnUiThread(() -> {
+                        restart.setEnabled(true);
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    });
+                }, "gboard-restart").start();
+            }).show());
+        list.addView(restart);
         info(list, "使用范围", "云端服务受网络、语言、账号及服务端策略影响。建议在便签中使用英语测试。ChatGPT 等应用可能被 Gboard 默认排除。开关开启不代表推理成功。");
         info(list, "开源许可", "维护：Kaede。基于 Akshayykadam/PixelBoard；GPL-3.0。完整许可与署名随 APK assets/licenses 提供。非 Google 官方组件。");
         setContentView(root);

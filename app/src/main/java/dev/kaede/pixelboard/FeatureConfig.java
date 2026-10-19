@@ -15,7 +15,7 @@ public final class FeatureConfig {
         try {
             SharedPreferences p = module.getRemotePreferences(GROUP);
             rambler = p.getBoolean("rambler", false);
-            spellchecker = p.getBoolean("spellchecker", false);
+            spellchecker = false; // Retired unverified inline-spellchecker experiment.
             diagnostics = p.getBoolean("diagnostics", false);
             writingTools = p.getBoolean("writing_tools", false);
             module.log(Log.INFO, TAG, "Remote settings read: rambler=" + rambler
@@ -25,8 +25,14 @@ public final class FeatureConfig {
             module.log(Log.ERROR, TAG, "Remote settings unavailable; fail closed", e);
         }
     }
-    public static boolean rambler() { return rambler; }
+    private static volatile boolean ramblerCompatible, writingCompatible;
+    public static boolean ramblerRequested() { return rambler; }
+    public static boolean writingRequested() { return writingTools; }
+    public static void compatibility(boolean voice, boolean writing) {
+        ramblerCompatible=voice; writingCompatible=writing;
+    }
+    public static boolean rambler() { return rambler && ramblerCompatible; }
     public static boolean spellchecker() { return spellchecker; }
     public static boolean diagnostics() { return diagnostics; }
-    public static boolean writingTools() { return writingTools; }
+    public static boolean writingTools() { return writingTools && writingCompatible; }
 }

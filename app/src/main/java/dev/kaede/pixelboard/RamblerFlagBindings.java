@@ -11,7 +11,7 @@ public final class RamblerFlagBindings {
         public final String profile, owner;
         public final Method getter;
         private final Field nameField;
-        private Binding(String profile, String owner, Method getter, Field field) {
+        Binding(String profile, String owner, Method getter, Field field) {
             this.profile = profile; this.owner = owner;
             this.getter = getter; this.nameField = field;
         }

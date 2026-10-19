@@ -1,4 +1,4 @@
-name: Cloud stable release
+name: Cloud candidate build
 on:
   workflow_dispatch:
   push:
@@ -42,11 +42,12 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" > signing-certificate.txt
           unzip -p "$APK" META-INF/xposed/java_init.list > entry.txt
           test -s entry.txt
+          python3 .github/scripts/check-release-apk.py "$APK"
           unzip -p "$APK" assets/licenses/GPL-3.0.txt | cmp LICENSE
           unzip -p "$APK" assets/licenses/NOTICE.txt | cmp NOTICE
           mkdir -p dist/notices
           cp LICENSE NOTICE THIRD_PARTY_NOTICES.md dependencies.txt signing-certificate.txt dist/notices/
-          cp "$APK" dist/Gboard-Rambler-API102-0.1.24-cloud-stable.apk
+          cp "$APK" dist/Gboard-Rambler-API102-0.1.25-cloud-rc1.apk
           cp app/build/outputs/mapping/release/mapping.txt dist/R8-mapping.txt
           python3 .github/scripts/collect-poms.py
           (cd dist/notices && zip -qr ../third-party-notices.zip .)
@@ -60,16 +61,16 @@ jobs:
             dist/*.txt
             dist/SHA256SUMS
             app/build/reports/tests/testDebugUnitTest/
-      - name: Publish tested snapshot
+      - name: Publish candidate only
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v0.1.24-cloud-stable >/dev/null 2>&1; then
+          if gh release view v0.1.25-cloud-rc1 >/dev/null 2>&1; then
             echo "Release already exists; leaving its tag and assets unchanged."
             exit 0
           fi
-          gh release create v0.1.24-cloud-stable \
+          gh release create v0.1.25-cloud-rc1 --prerelease --latest=false \
             --target "$GITHUB_SHA" \
-            --title "0.1.24 · Rambler 与基础云端写作工具（测试签名）" \
+            --title "0.1.25 RC1 · 自动定位与配置诊断（待实机验证）" \
             --notes-file RELEASE_NOTES.md \
             dist/*.apk dist/*.zip dist/R8-mapping.txt dist/SHA256SUMS

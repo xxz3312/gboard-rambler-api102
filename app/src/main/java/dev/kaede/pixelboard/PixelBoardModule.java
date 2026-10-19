@@ -67,30 +67,28 @@ public final class PixelBoardModule extends XposedModule {
         } catch (android.content.pm.PackageManager.NameNotFoundException e) {
             Log.w(TAG, "Gboard package version unavailable", e);
         }
-        Log.i(TAG, "Gboard Application Context available; SDK " + Build.VERSION.SDK_INT
-              + "; Rambler=" + FeatureConfig.rambler()
-              + "; diagnostics=" + FeatureConfig.diagnostics());
-        if (FeatureConfig.spellchecker()) installSpellChecker(loader);
+        GboardResolver.Result resolved=GboardResolver.resolve(hostContext,loader);
+        boolean voiceCompatible=resolved.flags!=null && resolved.voice!=null;
+        boolean writingCompatible=resolved.flags!=null && resolved.writing;
+        FeatureConfig.compatibility(voiceCompatible,writingCompatible);
+        CloudRuntimeStatus.send(hostContext,"COMPAT","rambler="+voiceCompatible
+                +" writing="+writingCompatible+" resolver="+resolved.source);
+        CloudRuntimeStatus.send(hostContext,"INIT","rambler="+FeatureConfig.rambler()
+                +" writingTools="+FeatureConfig.writingTools()+" version="+gboardVersion(context));
+        Log.i(TAG,"Compatibility rambler="+voiceCompatible+" writing="+writingCompatible
+                +" resolver="+resolved.source);
+        if (FeatureConfig.rambler()) installRambler(loader,resolved.voice);
+        if ((FeatureConfig.rambler() || FeatureConfig.writingTools()) && resolved.flags!=null)
+            installFlagGetter(resolved.flags);
         if (FeatureConfig.writingTools()) {
             WritingToolsDiagnostics.probe(loader);
-            if (FeatureConfig.diagnostics() && verifiedWritingTools184)
-                observeWritingTools184State(loader);
+            if (FeatureConfig.diagnostics() && verifiedWritingTools184) observeWritingTools184State(loader);
+            Log.i(TAG,"Writing Tools basic cloud; V2=false; backend=GBOARD_SERVER; local=false");
         }
-        RamblerBindings.Profile voiceProfile = null;
-        if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) {
-            voiceProfile = RamblerBindings.select(loader);
-            if (voiceProfile != null) installRambler(loader, voiceProfile);
-            else Log.w(TAG, "No unique verified Rambler selector signatures; voice hooks skipped");
-        }
-        if (FeatureConfig.rambler() || FeatureConfig.writingTools()) {
-            RamblerFlagBindings.Binding flags = voiceProfile != null
-                    ? RamblerFlagBindings.resolve(loader, voiceProfile.id)
-                    : RamblerFlagBindings.resolveUnique(loader);
-            if (flags != null) installFlagGetter(flags);
-            else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
-        }
-        if (FeatureConfig.writingTools())
-            Log.i(TAG, "Writing Tools policy=basic-cloud-v2; V2=false, backend=GBOARD_SERVER, hybrid=false, onDeviceProofread=false; overrides require resolved getter; UI/backend unverified");
+    }
+    private String gboardVersion(Context context) {
+        try { return context.getPackageManager().getPackageInfo(GBOARD,0).versionName; }
+        catch (Exception e) { return "unknown"; }
     }
 
     private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
@@ -159,9 +157,7 @@ public final class PixelBoardModule extends XposedModule {
                     if (context == null || !GBOARD.equals(context.getPackageName()))
                         return original;
                     // Use the Gboard-owned attach context, avoiding early ActivityThread nulls.
-                    Object writingResult = "writing_tools_enable_stable_entrance".equals(flag)
-                            && !verifiedWritingTools184 ? original
-                            : WritingToolsFlagPolicy.transform(flag, original, context);
+                    Object writingResult = WritingToolsFlagPolicy.transform(flag, original, context);
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.isToolbarFlag(flag)) {
                         int reads = writingToolbarReadCount.incrementAndGet();
                         if (reads <= 5)
@@ -170,6 +166,8 @@ public final class PixelBoardModule extends XposedModule {
                     }
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.targeted(flag)
                             && writingFlagsLogged.add(flag)) {
+                        CloudRuntimeStatus.send(hostContext, "FLAG", flag + " changed="
+                                + !java.util.Objects.equals(original, writingResult));
                         Log.i(TAG, "WritingTools flag observed: " + flag
                                 + " type=" + (original == null ? "null" : original.getClass().getSimpleName())
                                 + " changed=" + !java.util.Objects.equals(original, writingResult));
@@ -180,6 +178,7 @@ public final class PixelBoardModule extends XposedModule {
                     return original;
                 }
             });
+            CloudRuntimeStatus.send(hostContext, "GETTER", "installed profile=" + binding.profile);
             Log.i(TAG, "Installed shared guarded Rambler/WritingTools flag policy: " + binding.owner
                     + " / profile=" + binding.profile);
         } catch (RuntimeException | LinkageError e) {
@@ -239,15 +238,4 @@ public final class PixelBoardModule extends XposedModule {
         }
     }
 
-    private void installSpellChecker(ClassLoader loader) {
-        if (Build.VERSION.SDK_INT < 31) return;
-        try {
-            TargetMethod target = new TargetMethod("rcq", "m", "boolean",
-                    "android.content.Context", "android.view.textservice.TextServicesManager");
-            Method method = target.resolve(loader);
-            hook(method).intercept(chain -> true);
-        } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
-            Log.w(TAG, "Spellchecker hook skipped", e);
-        }
-    }
 }
