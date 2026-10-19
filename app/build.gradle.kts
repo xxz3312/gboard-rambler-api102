@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 20
-        versionName = "0.1.19-pixel-field-fix"
+        versionCode = 21
+        versionName = "0.1.20-local-prompt"
     }
     buildFeatures { buildConfig = true }
     buildTypes {
@@ -19,7 +19,7 @@ android {
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
-dependencies { implementation("org.luckypray:dexkit:2.3.0"); compileOnly("io.github.libxposed:api:102.0.0"); implementation("io.github.libxposed:service:102.0.0"); testImplementation("junit:junit:4.13.2"); implementation("com.google.mlkit:genai-rewriting:1.0.0-beta1"); implementation("com.google.mlkit:genai-proofreading:1.0.0-beta1") }
+dependencies { implementation("org.luckypray:dexkit:2.3.0"); compileOnly("io.github.libxposed:api:102.0.0"); implementation("io.github.libxposed:service:102.0.0"); testImplementation("junit:junit:4.13.2"); implementation("com.google.mlkit:genai-prompt:1.0.0-beta4"); implementation("com.google.mlkit:genai-rewriting:1.0.0-beta1"); implementation("com.google.mlkit:genai-proofreading:1.0.0-beta1") }
 
 
 

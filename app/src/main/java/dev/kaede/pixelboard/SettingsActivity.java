@@ -68,6 +68,10 @@ public final class SettingsActivity extends Activity {
         list.addView(prerequisites);
         addText(list, "实验作用域：Gboard、AICore、Private Compute Services。"
                 + "关闭 V2 时，不修改 AICore/Astrea。选择后端只改变请求路径，不代表模型、账号或服务已可用。", false);
+        android.widget.Button local = new android.widget.Button(this);
+        local.setText("AICore 端侧执行 · 基础模型");
+        local.setOnClickListener(v -> startActivity(new android.content.Intent(this, AiCoreLocalActivity.class)));
+        list.addView(local);
         android.widget.Button status = new android.widget.Button(this);
         status.setText("后端信息与公开 API 检测");
         status.setOnClickListener(v -> startActivity(new android.content.Intent(this, AiCoreProbeActivity.class)));
