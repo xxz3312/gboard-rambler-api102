@@ -28,3 +28,27 @@ jobs:
         with:
           name: gboard-rambler-debug-${{ github.ref_name }}
           path: app/build/outputs/apk/debug/*.apk
+
+  aicore-features:
+    runs-on: ubuntu-latest
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test feature-only module and installation guards
+        run: python3 -m unittest discover -s experiments/aicore-features/tests -v
+      - name: Package optional SM8850 root module
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          root = Path("experiments/aicore-features/root-module")
+          Path("dist").mkdir(exist_ok=True)
+          with ZipFile("dist/AICore-SM8850-Features-0.1.0.zip", "w", ZIP_DEFLATED) as archive:
+              for path in sorted(root.rglob("*")):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(root))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aicore-sm8850-features-0.1.0
+          path: dist/AICore-SM8850-Features-0.1.0.zip
