@@ -34,7 +34,6 @@ public final class PixelBoardModule extends XposedModule {
         try {
             Method attach = Application.class.getDeclaredMethod("attach", Context.class);
             hook(attach).intercept(chain -> {
-                Object result = chain.proceed();
                 Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
                 if (arg instanceof Context && bootstrapped.compareAndSet(false, true)) {
                     Context appContext = (Context) arg;
@@ -42,15 +41,16 @@ public final class PixelBoardModule extends XposedModule {
                         try { initializeForGboard(loader, appContext); }
                         catch (Throwable ex) {
                             CloudRuntimeStatus.send(appContext,"ERROR","initialization="+ex.getClass().getSimpleName());
-                            Log.e(TAG, "Gboard post-attach initialization failed", ex);
+                            Log.e(TAG, "Gboard pre-attach initialization failed", ex);
                         }
                     } else {
                         bootstrapped.set(false);
                     }
                 }
-                return result;
+                // Application.attach invokes host attachBaseContext; install before it reads/caches flags.
+                return chain.proceed();
             });
-            Log.i(TAG, "Application.attach hook installed");
+            Log.i(TAG, "Application.attach hook installed (before host attachBaseContext)");
         } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
             Log.e(TAG, "Application.attach hook installation failed", ex);
         }
@@ -257,3 +257,4 @@ public final class PixelBoardModule extends XposedModule {
     }
 
 }
+

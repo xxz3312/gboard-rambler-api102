@@ -5,13 +5,13 @@
 采用 GPL-3.0；完整声明见 [LICENSE](LICENSE)、[NOTICE](NOTICE) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ## 下载与功能
-[GitHub Releases](https://github.com/xxz3312/gboard-rambler-api102/releases) 提供历史稳定功能快照与 **0.1.25-cloud-rc2 候选包**。
+当前源码版本 **0.1.29**。CI 仅提供 APK 构建附件，不自动发布 Release。
 0.1.24 已收到写作工具不可用反馈，请勿将其视为实机验证通过的发布构建。
 原始功能依据为
 基于已实测的 0.1.7：Rambler 与基础云端写作工具。
 Writing Tools V2 私有后端、AICore/PCS、本地模型下载与 Pixel 伪装不属于该发布版。
 云端入口和英语校对在用户设备上实测可用；其他语言、功能与设备不承诺全部可用。
-R8 发布构建仍需实机复验。候选版使用语义自动定位并保留完整签名兼容路径；未知或歧义目标不安装 Hook。
+R8 构建仍需实机复验。本版使用语义自动定位并保留完整签名兼容路径；未知或歧义目标不安装 Hook。
 界面会分别报告 Rambler 和写作工具的适配结果，无法定位时红字提示“不支持该版本 Gboard”。
 未收到本版运行事件不会直接判定不支持。
 
@@ -50,3 +50,4 @@ Material 3 界面跟随系统深浅色，Android 12+ 使用动态配色。
 adb shell am start -n dev.kaede.pixelboard/.SettingsActivity
 adb shell pm enable dev.kaede.pixelboard/.Launcher
 ```
+

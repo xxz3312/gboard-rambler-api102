@@ -15,7 +15,7 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
 
     @Override public void onCreate() {
         super.onCreate();
-        getSharedPreferences("features", MODE_PRIVATE).edit().putBoolean("spellchecker", false).apply();
+        getSharedPreferences("features", MODE_PRIVATE).edit().remove("spellchecker").apply();
         try { XposedServiceHelper.registerListener(this); }
         catch (RuntimeException e) { Log.e(TAG, "LSPosed service listener registration failed", e); }
     }
@@ -42,7 +42,7 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
             SharedPreferences remote = current.getRemotePreferences(FeatureConfig.GROUP);
             boolean success = remote.edit()
                     .putBoolean("rambler", local.getBoolean("rambler", false))
-                    .putBoolean("spellchecker", false)
+                    .remove("spellchecker")
                     .putBoolean("diagnostics", local.getBoolean("diagnostics", false))
                     .putBoolean("writing_tools", local.getBoolean("writing_tools", false))
                     .commit();
@@ -54,3 +54,4 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
         }
     }
 }
+

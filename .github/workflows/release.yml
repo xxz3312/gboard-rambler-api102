@@ -1,4 +1,4 @@
-name: Cloud candidate build
+name: APK verification
 on:
   workflow_dispatch:
   push:
@@ -7,7 +7,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -47,30 +47,17 @@ jobs:
           unzip -p "$APK" assets/licenses/NOTICE.txt | cmp NOTICE
           mkdir -p dist/notices
           cp LICENSE NOTICE THIRD_PARTY_NOTICES.md dependencies.txt signing-certificate.txt dist/notices/
-          cp "$APK" dist/Gboard-Rambler-API102-0.1.25-cloud-rc2.apk
+          cp "$APK" dist/Gboard-Rambler-API102-0.1.29.apk
           cp app/build/outputs/mapping/release/mapping.txt dist/R8-mapping.txt
           python3 .github/scripts/collect-poms.py
           (cd dist/notices && zip -qr ../third-party-notices.zip .)
           (cd dist && sha256sum *.apk *.zip R8-mapping.txt > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
-          name: cloud-stable-release
+          name: Gboard-Rambler-0.1.29
           path: |
             dist/*.apk
             dist/*.zip
             dist/*.txt
             dist/SHA256SUMS
             app/build/reports/tests/testDebugUnitTest/
-      - name: Publish candidate only
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view v0.1.25-cloud-rc2 >/dev/null 2>&1; then
-            echo "Release already exists; leaving its tag and assets unchanged."
-            exit 0
-          fi
-          gh release create v0.1.25-cloud-rc2 --prerelease --latest=false \
-            --target "$GITHUB_SHA" \
-            --title "0.1.25 RC2 · 自动定位与配置诊断（待实机验证）" \
-            --notes-file RELEASE_NOTES.md \
-            dist/*.apk dist/*.zip dist/R8-mapping.txt dist/SHA256SUMS

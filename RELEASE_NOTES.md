@@ -1,6 +1,6 @@
-# 0.1.25-cloud-rc2
+# 0.1.29
 
-修复候选版，尚未获得实机成功结果。
+写作工具修复构建；仅构建验证，尚未获得本版实机成功结果。
 
 RC2 补充分开记录定位结果、Hook 安装结果和初始化错误；安装不完整时关闭对应功能的改写逻辑，避免把定位成功误报为功能就绪。
 
@@ -21,8 +21,12 @@ RC2 补充分开记录定位结果、Hook 安装结果和初始化错误；安�
 
 ## 签名
 仍使用 CI 测试签名，不能保证与旧 APK 一致。签名冲突时需卸载旧模块再安装，模块配置会被清除。
-本候选版不会清理 Gboard、AICore 或 PCS 数据，也不包含 V2/AICore 私有后端。
+本版不会清理 Gboard、AICore 或 PCS 数据，也不包含 V2/AICore 私有后端。
 
 ## 开源
 GPL-3.0，来源见 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md。
 DexKit 2.3.0 的 Java/Kotlin 层与核心许可、源码链接及替换说明随 APK 附带。
+
+
+- 在 Application.attach 执行 Gboard attachBaseContext 之前安装 flag 策略，避免宿主提前缓存原值。
+- 版本号统一为纯数字；CI 仅上传构建产物，不再创建或修改 GitHub Release。

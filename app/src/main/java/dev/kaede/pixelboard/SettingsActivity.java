@@ -53,11 +53,11 @@ public final class SettingsActivity extends AppCompatActivity {
             return insets;
         });
         text(list, "Gboard Rambler", com.google.android.material.R.style.TextAppearance_Material3_HeadlineLarge);
-        text(list, "API 102 · 0.1.25-cloud-rc2", com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
-        info(list, "修复候选版", "基于 0.1.7 的基础云端路径。修改开关后需重启 Gboard。0.1.24 已收到不可用反馈；本版需要实机复验。");
+        text(list, "API 102 · " + CloudRuntimeStatus.VERSION, com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
+        info(list, "写作工具", "使用基础云端校对与改写。修改开关后需重启 Gboard；版本适配和 Hook 状态见下方。");
         section(list, "功能");
         toggle(list, "rambler", "Rambler", "实验功能；原版路径已在用户设备验证。", false);
-        toggle(list, "writing_tools", "AI 写作工具", "基础云端校对与改写。原 0.1.7 已验证英语校对，本候选版待复验；需完成 Gboard 同意流程。", false);
+        toggle(list, "writing_tools", "AI 写作工具", "基础云端校对与改写。需联网并完成 Gboard 同意流程。", false);
         section(list, "诊断");
         toggle(list, "diagnostics", "诊断日志", "记录 Hook 状态。Logcat 标签：PixelBoardLS。", false);
         section(list, "外观");
@@ -198,3 +198,4 @@ public final class SettingsActivity extends AppCompatActivity {
         refreshLauncher();
     }
 }
+

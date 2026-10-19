@@ -19,7 +19,7 @@ public final class ConfigProvider extends ContentProvider {
         String[] columns = {"rambler", "spellchecker", "diagnostics", "writing_tools"};
         MatrixCursor c = new MatrixCursor(columns, 1);
         c.addRow(new Object[]{p.getBoolean("rambler", false) ? 1 : 0,
-                p.getBoolean("spellchecker", false) ? 1 : 0,
+                0 /* retired; read-only legacy column */,
                 p.getBoolean("diagnostics", false) ? 1 : 0,
                 p.getBoolean("writing_tools", false) ? 1 : 0});
         return c;
@@ -29,3 +29,4 @@ public final class ConfigProvider extends ContentProvider {
     @Override public int delete(Uri uri, String selection, String[] args) { throw new UnsupportedOperationException(); }
     @Override public int update(Uri uri, ContentValues values, String selection, String[] args) { throw new UnsupportedOperationException(); }
 }
+
