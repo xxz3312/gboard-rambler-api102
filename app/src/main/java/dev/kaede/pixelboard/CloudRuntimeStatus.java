@@ -39,7 +39,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
             else if(pid!=prefs.getInt("pid",-1))return;
             edit.putInt("pid",pid).putString("version",VERSION)
                     .putString(event,detail).putLong(event+"_when",intent.getLongExtra("when",0)).apply();
-        } catch(RuntimeException ignored) {}
+        } catch(Exception ignored) {}
     }
     public static boolean unsupported(Context context) {
         android.content.SharedPreferences p=context.getSharedPreferences(PREF,0);

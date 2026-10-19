@@ -81,7 +81,7 @@ public final class SettingsActivity extends AppCompatActivity {
                     + "\n\n" + CloudRuntimeStatus.report(this));
             runtime.setTextColor(CloudRuntimeStatus.unsupported(this)
                     ? com.google.android.material.color.MaterialColors.getColor(runtime,
-                        com.google.android.material.R.attr.colorError)
+                        androidx.appcompat.R.attr.colorError)
                     : com.google.android.material.color.MaterialColors.getColor(runtime,
                         com.google.android.material.R.attr.colorOnSurface));
         };
