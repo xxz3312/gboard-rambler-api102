@@ -1,0 +1,27 @@
+Gboard Rambler API102
+Copyright (C) 2026 Kaede and contributors.
+
+This is an independent LSPosed API 102 runtime adaptation of:
+  PixelBoard — Akshay Kadam / Akshayykadam and contributors
+  https://github.com/Akshayykadam/PixelBoard
+  Upstream reviewed revision: 8d1d53d58f98abb76adac31facd2408261f732bb
+
+Upstream declares GNU GPL version 3. See LICENSE for the full license text.
+This project's module source is distributed under GPL-3.0-only.
+Original upstream notices and contributor credits are retained by reference.
+PixelBoard also credits JasonWu for its foundational Gboard patch research.
+
+Adapted material includes Rambler selection policies, versioned symbol mappings,
+typed feature-flag policies, and Writing Tools integration research. The runtime
+API 102 hooks, configuration bridge, diagnostics and packaging are changes by
+this project. This project does not claim sole authorship of upstream work.
+
+Upstream README describes the project as intended for personal education,
+private study and experimental research, and not intended for commercial
+distribution or monetization. This distribution is a free research module.
+This notice does not add restrictions to, or replace, the GPL text.
+
+Google, Gboard, Pixel, Android and Gemini are trademarks of their respective
+owners. This project is not affiliated with or endorsed by Google, PixelBoard
+or LSPosed. No Google APK, model weights or proprietary firmware is distributed.
+No warranty is provided; see LICENSE.
