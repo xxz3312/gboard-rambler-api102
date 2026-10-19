@@ -13,13 +13,15 @@ final class PromptModelOptions {
     static String label(int index) { validate(index); return LABELS[index]; }
     static ModelConfig config(int index) {
         validate(index);
-        return new ModelConfig.Builder()
-                .setReleaseStage(index<2 ? ModelReleaseStage.STABLE : ModelReleaseStage.PREVIEW)
-                .setPreference(index%2==0 ? ModelPreference.FULL : ModelPreference.FAST).build();
+        ModelConfig.Builder builder=new ModelConfig.Builder();
+        builder.setReleaseStage(index<2 ? ModelReleaseStage.STABLE : ModelReleaseStage.PREVIEW);
+        builder.setPreference(index%2==0 ? ModelPreference.FULL : ModelPreference.FAST);
+        return builder.build();
     }
     static GenerativeModelFutures client(int index) {
-        return GenerativeModelFutures.from(Generation.INSTANCE.getClient(
-                new GenerationConfig.Builder().setModelConfig(config(index)).build()));
+        GenerationConfig.Builder builder=new GenerationConfig.Builder();
+        builder.setModelConfig(config(index));
+        return GenerativeModelFutures.from(Generation.INSTANCE.getClient(builder.build()));
     }
     private static void validate(int index) {
         if(index<0||index>=LABELS.length)throw new IllegalArgumentException("Unknown model configuration");
