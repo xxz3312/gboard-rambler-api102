@@ -6,7 +6,7 @@ on:
 jobs:
   debug:
     runs-on: ubuntu-latest
-    permissions: {contents: read}
+    permissions: {contents: write}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -28,6 +28,28 @@ jobs:
         with:
           name: gboard-rambler-debug-${{ github.ref_name }}
           path: app/build/outputs/apk/debug/*.apk
+
+      - name: Publish model matrix diagnostic candidate
+        if: github.ref_name == 'writing-tools-v2-experiment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p dist
+          APK=dist/PixelBoard-0.1.26-model-matrix-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" > dist/signing-certificate.txt
+          unzip -p "$APK" assets/licenses/GPL-3.0.txt | cmp LICENSE
+          unzip -p "$APK" assets/licenses/NOTICE.txt | cmp NOTICE
+          cp LICENSE NOTICE THIRD_PARTY_NOTICES.md dist/
+          (cd dist && sha256sum *.apk > SHA256SUMS)
+          if gh release view v0.1.26-model-matrix >/dev/null 2>&1; then
+            echo "Candidate already exists; preserving its assets."
+            exit 0
+          fi
+          gh release create v0.1.26-model-matrix --prerelease --latest=false --target "$GITHUB_SHA" \
+            --title "0.1.26 · AICore 模型配置诊断（实验版）" \
+            --notes-file docs/AICORE_MODEL_MATRIX.md dist/*
 
   aicore-features:
     runs-on: ubuntu-latest

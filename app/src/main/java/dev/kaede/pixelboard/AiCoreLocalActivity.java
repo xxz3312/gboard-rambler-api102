@@ -11,6 +11,8 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.text.InputFilter;
 import android.widget.Button;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -42,6 +44,8 @@ public final class AiCoreLocalActivity extends Activity {
     private TextView output;
     private EditText input;
     private String metadata = "";
+    private Spinner modelChoice;
+    private final ArrayList<String> matrixResults = new ArrayList<>();
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -57,6 +61,12 @@ public final class AiCoreLocalActivity extends Activity {
                 + "首次使用：查询 → 必要时下载 → 执行。执行时请保持本页在前台。", 15);
         text(list, "这条路径独立于 Gboard V2 私有接口；本页成功仍需后续接入 Gboard。"
                 + "不自动回退云端，不记录或保存输入、输出。", 14);
+        text(list, "模型配置只选择 AICore 提供的变体；不会修改设备身份或清单标签。Preview 可用性仍受设备和预览资格限制。", 14);
+        modelChoice=new Spinner(this);
+        modelChoice.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item,
+                PromptModelOptions.LABELS));
+        list.addView(modelChoice);
+        button(list, "查询四种模型配置（不下载、不推理）", () -> begin(4));
         input = new EditText(this);
         input.setFilters(new InputFilter[] {new InputFilter.LengthFilter(1000)});
         input.setMinLines(2);
@@ -111,7 +121,7 @@ public final class AiCoreLocalActivity extends Activity {
     private void begin(int action) {
         if (busy || !visible) return;
         final String draft = input.getText().toString().trim();
-        if (action >= 2 && draft.isEmpty()) {
+        if ((action == 2 || action == 3) && draft.isEmpty()) {
             input.setError("请输入英语短文");
             return;
         }
@@ -119,12 +129,21 @@ public final class AiCoreLocalActivity extends Activity {
         long token = serial;
         started = SystemClock.elapsedRealtime();
         metadata = environment() + "\n操作=" + action
-                + "（0查询 / 1下载 / 2校对 / 3正式改写）\n";
+                + "（0查询 / 1下载 / 2校对 / 3正式改写 / 4四种配置）\n";
         report.setText(metadata);
         output.setText("本次尚无模型输出。");
         setBusy(true);
         try {
-            if (model == null) model = GenerativeModelFutures.from(Generation.INSTANCE.getClient());
+            closeModel();
+            if(action==4) {
+                matrixResults.clear();
+                append("顺序查询四种配置；每项状态最多 20 秒、名称最多 10 秒。保持本页前台。");
+                queryMatrix(0,token);
+                return;
+            }
+            int choice=modelChoice.getSelectedItemPosition();
+            append("模型配置="+PromptModelOptions.label(choice));
+            model=PromptModelOptions.client(choice);
             append("正在查询基础模型状态…");
             await(model.checkStatus(), token, 30000, status -> {
                 append("Prompt 状态=" + statusName(status));
@@ -140,6 +159,45 @@ public final class AiCoreLocalActivity extends Activity {
                 }
             }, this::fail);
         } catch (RuntimeException error) { fail(error); }
+    }
+
+    private void queryMatrix(int index,long token) {
+        if(!current(token))return;
+        closeModel();
+        if(index>=PromptModelOptions.LABELS.length) {
+            append("=== 四种配置汇总 ===");
+            for(String line:matrixResults)append(line);
+            finish("查询结束；未下载模型，未执行推理。UNAVAILABLE 不能区分设备不支持与配置尚未取得。");
+            return;
+        }
+        String label=PromptModelOptions.label(index);
+        append("正在查询 "+label);
+        try {
+            model=PromptModelOptions.client(index);
+            await(model.checkStatus(),token,20000,status -> {
+                String result=label+" status="+statusName(status);
+                append(result);
+                try {
+                    await(model.getBaseModelName(),token,10000,name -> {
+                        matrixResults.add(result+" baseModel="+name);
+                        append("基础模型="+name);
+                        queryMatrix(index+1,token);
+                    },error -> {
+                        matrixResults.add(result+" baseModelError="+describe(error));
+                        queryMatrix(index+1,token);
+                    });
+                } catch(RuntimeException error) {
+                    matrixResults.add(result+" baseModelError="+describe(error));
+                    queryMatrix(index+1,token);
+                }
+            },error -> {
+                matrixResults.add(label+" statusError="+describe(error));
+                queryMatrix(index+1,token);
+            });
+        } catch(RuntimeException error) {
+            matrixResults.add(label+" initializationError="+describe(error));
+            queryMatrix(index+1,token);
+        }
     }
 
     private void afterStatus(int action, String draft, int status, long token) {
@@ -264,6 +322,7 @@ public final class AiCoreLocalActivity extends Activity {
         busy = value;
         for (Button button : actions) button.setEnabled(!value);
         if (input != null) input.setEnabled(!value);
+        if (modelChoice != null) modelChoice.setEnabled(!value);
     }
     private void append(String message) {
         metadata += message + "\n";

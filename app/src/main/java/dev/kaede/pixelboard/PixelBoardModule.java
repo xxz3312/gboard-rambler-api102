@@ -211,6 +211,7 @@ public final class PixelBoardModule extends XposedModule {
                         "version=" + pkg.getLongVersionCode());
                 return;
             }
+            if(pkg.getLongVersionCode()==513248L) observeManifestWire513248(loader,context);
             Method clientName = new TargetMethod(profile.clientClass, "a", "java.lang.String").resolve(loader);
             Method fetch = new TargetMethod(profile.fetchClass, "a", "java.lang.Object",
                     profile.clientClass, "java.util.Map", profile.continuationClass).resolve(loader);
@@ -234,6 +235,37 @@ public final class PixelBoardModule extends XposedModule {
             });
             recordStatus(context, "MANIFEST_OBSERVER_READY", "version=" + pkg.getLongVersionCode()
                     + " target=" + profile.fetchClass + ".a read_only=true");
+        }
+    }
+
+    private void observeManifestWire513248(ClassLoader loader,Context context) {
+        try {
+            Class<?> request=Class.forName("icn",false,loader);
+            Class<?> labels=Class.forName("icm",false,loader);
+            ManifestRequestMetadata.Binding binding=new ManifestRequestMetadata.Binding(request,labels);
+            Method rpc=Class.forName("icu",false,loader).getDeclaredMethod(
+                    "b",Class.forName("krb",false,loader),request);
+            if(java.lang.reflect.Modifier.isStatic(rpc.getModifiers())
+                    || !java.util.concurrent.Future.class.isAssignableFrom(rpc.getReturnType()))
+                throw new NoSuchMethodException("Unexpected manifest RPC signature");
+            AtomicInteger hits=new AtomicInteger();
+            hook(rpc).intercept(chain -> {
+                try {
+                    if(chain.getArgs().size()==2 && request.isInstance(chain.getArgs().get(1))
+                            && hits.incrementAndGet()<=16) {
+                        String line=binding.describe(chain.getArgs().get(1));
+                        Log.i(TAG,"MANIFEST_WIRE "+line);
+                        recordStatus(context,"MANIFEST_WIRE",line);
+                    }
+                } catch(ReflectiveOperationException|RuntimeException|LinkageError error) {
+                    Log.w(TAG,"Manifest wire observation failed; original request retained");
+                }
+                return chain.proceed();
+            });
+            recordStatus(context,"MANIFEST_OBSERVER_READY","stage=pre_pcs_rpc version=513248 read_only=true");
+        } catch(ReflectiveOperationException|RuntimeException|LinkageError error) {
+            recordStatus(context,"MANIFEST_OBSERVER_UNSUPPORTED","stage=pre_pcs_rpc error="+error.getClass().getSimpleName());
+            Log.w(TAG,"Manifest wire observer not installed",error);
         }
     }
 
