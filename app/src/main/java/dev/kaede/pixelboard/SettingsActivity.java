@@ -3,179 +3,342 @@ package dev.kaede.pixelboard;
 import android.content.ComponentName;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.TextAppearanceSpan;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.google.android.material.button.MaterialButton;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.content.res.AppCompatResources;
+import androidx.core.graphics.ColorUtils;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.color.DynamicColors;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.divider.MaterialDivider;
 import com.google.android.material.materialswitch.MaterialSwitch;
+import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textview.MaterialTextView;
 
-/** Module UI; launcher visibility never changes the exported settings component. */
+/** Compact Material 3 settings. Launcher visibility never disables module settings. */
 public final class SettingsActivity extends AppCompatActivity {
     private SharedPreferences prefs;
     private MaterialSwitch launcherSwitch;
     private boolean refreshingLauncher;
-    private Runnable statusRefresh;
-    private final android.os.Handler statusHandler=new android.os.Handler(android.os.Looper.getMainLooper());
-    private final Runnable statusTicker=new Runnable() {
+    private LinearLayout root;
+    private MaterialTextView frameworkSummary, compatibilityTitle, compatibilitySummary;
+    private View restartAction;
+    private TextView detailText;
+    private final android.os.Handler statusHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable statusTicker = new Runnable() {
         @Override public void run() {
-            if(statusRefresh!=null)statusRefresh.run();
-            statusHandler.postDelayed(this,1000);
+            refreshStatus();
+            statusHandler.postDelayed(this, 1000);
         }
     };
+
     @Override protected void onResume() {
-        super.onResume(); statusHandler.removeCallbacks(statusTicker); statusHandler.post(statusTicker);
+        super.onResume();
+        if (launcherSwitch != null) refreshLauncher();
+        statusHandler.removeCallbacks(statusTicker);
+        statusHandler.post(statusTicker);
     }
+
     @Override protected void onPause() {
-        statusHandler.removeCallbacks(statusTicker); super.onPause();
+        statusHandler.removeCallbacks(statusTicker);
+        super.onPause();
     }
+
     @Override protected void onCreate(Bundle state) {
         DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(state);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         prefs = getSharedPreferences("features", MODE_PRIVATE);
-        ScrollView root = new ScrollView(this);
-        root.setFillViewport(true);
-        LinearLayout list = column();
-        list.setPadding(dp(20), dp(24), dp(20), dp(32));
-        root.addView(list);
+        root = column();
+        int surface = color(com.google.android.material.R.attr.colorSurface);
+        root.setBackgroundColor(surface);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        boolean light = ColorUtils.calculateLuminance(surface) > 0.5;
+        WindowCompat.getInsetsController(getWindow(), root).setAppearanceLightStatusBars(light);
+        WindowCompat.getInsetsController(getWindow(), root).setAppearanceLightNavigationBars(light);
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
-            androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            androidx.core.graphics.Insets bars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
             return insets;
         });
-        text(list, "Gboard Rambler", com.google.android.material.R.style.TextAppearance_Material3_HeadlineLarge);
-        text(list, "API 102 · " + CloudRuntimeStatus.VERSION, com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
-        info(list, "写作工具", "使用基础云端校对与改写。修改开关后需重启 Gboard；版本适配和 Hook 状态见下方。");
+
+        MaterialToolbar toolbar = new MaterialToolbar(this);
+        toolbar.setTitle("Gboard Rambler");
+        toolbar.setTitleTextAppearance(this, com.google.android.material.R.style.TextAppearance_Material3_TitleLarge);
+        toolbar.setBackgroundColor(surface);
+        root.addView(toolbar, new LinearLayout.LayoutParams(-1, dp(64)));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        FrameLayout frame = new FrameLayout(this);
+        scroll.addView(frame);
+        LinearLayout list = column();
+        list.setPadding(dp(16), 0, dp(16), dp(24));
+        // Keep settings readable in landscape and on large displays.
+        int width = getResources().getConfiguration().screenWidthDp > 640 ? dp(640) : -1;
+        frame.addView(list, new FrameLayout.LayoutParams(width, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL));
+
         section(list, "功能");
-        toggle(list, "rambler", "Rambler", "实验功能；原版路径已在用户设备验证。", false);
-        toggle(list, "writing_tools", "AI 写作工具", "基础云端校对与改写。需联网并完成 Gboard 同意流程。", false);
-        section(list, "诊断");
-        toggle(list, "diagnostics", "诊断日志", "记录 Hook 状态。Logcat 标签：PixelBoardLS。", false);
+        LinearLayout features = group(list);
+        toggle(features, "rambler", "Rambler", "语音输入与智能编辑", R.drawable.ic_mic, false);
+        divider(features);
+        toggle(features, "writing_tools", "AI 写作工具", "联网校对与改写", R.drawable.ic_edit, false);
+        MaterialTextView hint = label("更改功能后，请重新启动 Gboard。",
+                com.google.android.material.R.style.TextAppearance_Material3_BodySmall,
+                com.google.android.material.R.attr.colorOnSurfaceVariant);
+        hint.setPadding(dp(16), dp(8), dp(16), 0);
+        list.addView(hint);
+
         section(list, "外观");
-        launcherSwitch = toggle(list, null, "隐藏桌面图标",
-                "隐藏后可从 LSPosed 模块页打开设置，关闭此开关即可恢复。", isLauncherHidden());
+        LinearLayout appearance = group(list);
+        launcherSwitch = toggle(appearance, null, "隐藏桌面图标", "隐藏后可从 LSPosed 打开设置",
+                R.drawable.ic_visibility_off, isLauncherHidden());
         launcherSwitch.setOnCheckedChangeListener((button, hidden) -> {
             if (refreshingLauncher) return;
             if (hidden) {
                 new MaterialAlertDialogBuilder(this)
-                    .setTitle("隐藏桌面图标？")
-                    .setMessage("请确认你能从 LSPosed 的模块页面打开设置。隐藏只影响桌面入口，模块仍会运行。也可通过 ADB 恢复，命令见 README。")
-                    .setNegativeButton("取消", (dialog, which) -> refreshLauncher())
-                    .setPositiveButton("隐藏", (dialog, which) -> setLauncherHidden(true))
-                    .setOnCancelListener(dialog -> refreshLauncher()).show();
+                        .setTitle("隐藏桌面图标？")
+                        .setMessage("隐藏后可从 LSPosed 模块页打开设置，并关闭此开关恢复图标。")
+                        .setNegativeButton("取消", (dialog, which) -> refreshLauncher())
+                        .setPositiveButton("隐藏", (dialog, which) -> setLauncherHidden(true))
+                        .setOnCancelListener(dialog -> refreshLauncher()).show();
             } else setLauncherHidden(false);
         });
-        section(list, "状态与来源");
-        TextView runtime = text(list, "", com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
-        Runnable refreshStatus = () -> {
-            runtime.setText(((ModuleApp) getApplication()).configurationStatus()
-                    + "\n\n" + CloudRuntimeStatus.report(this));
-            runtime.setTextColor(CloudRuntimeStatus.unsupported(this)
-                    ? com.google.android.material.color.MaterialColors.getColor(runtime,
-                        androidx.appcompat.R.attr.colorError)
-                    : com.google.android.material.color.MaterialColors.getColor(runtime,
-                        com.google.android.material.R.attr.colorOnSurface));
-        };
-        statusRefresh=refreshStatus;
-        refreshStatus.run();
-        MaterialButton refresh = new MaterialButton(this);
-        refresh.setText("同步配置并刷新运行状态");
-        refresh.setOnClickListener(v -> {
+
+        section(list, "运行与诊断");
+        LinearLayout status = group(list);
+        Row framework = row(status, "框架服务", "", R.drawable.ic_link, null);
+        frameworkSummary = framework.summary;
+        divider(status);
+        Row compatibility = row(status, "适配与运行状态", "查看 Gboard 适配和 Hook 详情",
+                R.drawable.ic_info, this::showRuntimeDetails);
+        compatibilityTitle = compatibility.title;
+        compatibilitySummary = compatibility.summary;
+        divider(status);
+        row(status, "同步配置", "将开关设置同步到 LSPosed", R.drawable.ic_sync, () -> {
             ((ModuleApp) getApplication()).sync();
-            refreshStatus.run();
+            refreshStatus();
+            Snackbar.make(root, ModuleApp.connected() ? "已请求同步，结果见运行详情" : "等待 LSPosed 服务连接",
+                    Snackbar.LENGTH_SHORT).show();
         });
-        list.addView(refresh);
-        MaterialButton restart = new MaterialButton(this);
-        restart.setText("Root 重启 Gboard");
-        restart.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
-            .setTitle("重启 Gboard？")
-            .setMessage("将强制停止 Gboard；当前正在输入的未提交内容可能丢失。随后请手动唤起键盘。")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("重启", (dialog, which) -> {
-                ((ModuleApp) getApplication()).sync();
-                restart.setEnabled(false);
-                new Thread(() -> {
-                    String result;
-                    try {
-                        java.lang.Process process = new ProcessBuilder("su", "-c",
-                                "am force-stop com.google.android.inputmethod.latin").start();
-                        boolean done = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS);
-                        if (!done) { process.destroy(); result = "Root 请求超时；可从系统设置强制停止 Gboard。"; }
-                        else result = process.exitValue() == 0
-                                ? "已发送停止请求，请唤起 Gboard 后刷新状态。"
-                                : "Root 停止失败；可从系统设置强制停止 Gboard。";
-                    } catch (Exception error) { result = "无法执行 Root 停止：" + error.getClass().getSimpleName(); }
-                    String message = result;
-                    runOnUiThread(() -> {
-                        restart.setEnabled(true);
-                        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-                    });
-                }, "gboard-restart").start();
-            }).show());
-        list.addView(restart);
-        info(list, "使用范围", "云端服务受网络、语言、账号及服务端策略影响。建议在便签中使用英语测试。ChatGPT 等应用可能被 Gboard 默认排除。开关开启不代表推理成功。");
-        info(list, "开源许可", "维护：Kaede。基于 Akshayykadam/PixelBoard；GPL-3.0。完整许可与署名随 APK assets/licenses 提供。非 Google 官方组件。");
+        divider(status);
+        restartAction = row(status, "重启 Gboard", "需要 Root 权限", R.drawable.ic_restart,
+                this::confirmRestart).view;
+        divider(status);
+        toggle(status, "diagnostics", "诊断日志", "记录适配与 Hook 状态", R.drawable.ic_diagnostics, false);
+
+        section(list, "关于");
+        LinearLayout about = group(list);
+        row(about, "使用说明", "网络、语言与使用范围", R.drawable.ic_help, () ->
+                new MaterialAlertDialogBuilder(this).setTitle("使用说明")
+                        .setMessage("AI 写作工具需要联网，并完成 Gboard 的同意流程。建议先在普通便签中用英语测试；部分应用可能被 Gboard 排除。\n\n开关开启、配置同步或适配成功不代表云端请求成功。修改功能后，请强制停止并重新唤起 Gboard。")
+                        .setPositiveButton("知道了", null).show());
+        divider(about);
+        row(about, "Gboard Rambler", "版本 " + CloudRuntimeStatus.VERSION + " · Kaede", R.drawable.ic_info, () ->
+                new MaterialAlertDialogBuilder(this).setTitle("关于 Gboard Rambler")
+                        .setMessage("版本 " + CloudRuntimeStatus.VERSION + " · API 102\n维护：Kaede\n\n基于 Akshayykadam/PixelBoard，采用 GPL-3.0。完整许可与署名随 APK 的 assets/licenses 提供。本项目非 Google 官方组件。")
+                        .setPositiveButton("关闭", null).show());
         setContentView(root);
+        ViewCompat.requestApplyInsets(root);
+        refreshStatus();
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    private int color(int attr) { return MaterialColors.getColor(this, attr, "SettingsActivity"); }
     private LinearLayout column() {
-        LinearLayout result = new LinearLayout(this);
-        result.setOrientation(LinearLayout.VERTICAL);
-        return result;
-    }
-    private TextView text(LinearLayout parent, String value, int appearance) {
-        MaterialTextView view = new MaterialTextView(this);
-        view.setTextAppearance(appearance);
-        view.setText(value);
-        view.setPadding(0, dp(6), 0, dp(8));
-        parent.addView(view);
+        LinearLayout view = new LinearLayout(this);
+        view.setOrientation(LinearLayout.VERTICAL);
         return view;
     }
-    private void section(LinearLayout parent, String title) {
-        TextView label = text(parent, title, com.google.android.material.R.style.TextAppearance_Material3_TitleMedium);
-        label.setPadding(0, dp(24), 0, dp(12));
+    private MaterialTextView label(String value, int appearance, int colorAttr) {
+        MaterialTextView view = new MaterialTextView(this);
+        view.setTextAppearance(appearance);
+        view.setTextColor(color(colorAttr));
+        view.setText(value);
+        return view;
     }
-    private LinearLayout card(LinearLayout parent) {
+    private void section(LinearLayout list, String title) {
+        MaterialTextView label = label(title, com.google.android.material.R.style.TextAppearance_Material3_LabelLarge,
+                com.google.android.material.R.attr.colorPrimary);
+        label.setAccessibilityHeading(true);
+        label.setPadding(dp(16), dp(24), dp(16), dp(8));
+        list.addView(label);
+    }
+    private LinearLayout group(LinearLayout list) {
         MaterialCardView card = new MaterialCardView(this);
-        card.setRadius(dp(24));
+        card.setRadius(dp(16));
         card.setCardElevation(0);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.bottomMargin = dp(10);
-        parent.addView(card, params);
+        card.setStrokeWidth(0);
+        card.setClipToOutline(true);
+        card.setCardBackgroundColor(color(com.google.android.material.R.attr.colorSurfaceContainerLow));
+        list.addView(card, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout contents = column();
-        contents.setPadding(dp(20), dp(12), dp(20), dp(16));
         card.addView(contents);
         return contents;
     }
-    private void info(LinearLayout parent, String title, String body) {
-        LinearLayout contents = card(parent);
-        text(contents, title, com.google.android.material.R.style.TextAppearance_Material3_TitleMedium);
-        text(contents, body, com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+    private void divider(LinearLayout group) {
+        MaterialDivider divider = new MaterialDivider(this);
+        divider.setDividerColor(color(com.google.android.material.R.attr.colorOutlineVariant));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(1));
+        params.setMarginStart(dp(56));
+        params.setMarginEnd(dp(16));
+        group.addView(divider, params);
     }
-    private MaterialSwitch toggle(LinearLayout parent, String key, String title, String note, boolean initial) {
-        LinearLayout contents = card(parent);
+    private Drawable icon(int resource) {
+        Drawable icon = AppCompatResources.getDrawable(this, resource).mutate();
+        icon.setTint(color(com.google.android.material.R.attr.colorOnSurfaceVariant));
+        icon.setBounds(0, 0, dp(24), dp(24));
+        return icon;
+    }
+    private MaterialSwitch toggle(LinearLayout group, String key, String title, String note,
+            int resource, boolean initial) {
         MaterialSwitch toggle = new MaterialSwitch(this);
-        toggle.setText(title);
-        toggle.setMinHeight(dp(56));
-        toggle.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium);
+        SpannableString text = new SpannableString(title + "\n" + note);
+        text.setSpan(new TextAppearanceSpan(this, com.google.android.material.R.style.TextAppearance_Material3_BodyLarge),
+                0, title.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.setSpan(new TextAppearanceSpan(this, com.google.android.material.R.style.TextAppearance_Material3_BodyMedium),
+                title.length() + 1, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.setSpan(new ForegroundColorSpan(color(com.google.android.material.R.attr.colorOnSurfaceVariant)),
+                title.length() + 1, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        toggle.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
+        toggle.setTextColor(color(com.google.android.material.R.attr.colorOnSurface));
+        toggle.setText(text);
+        toggle.setGravity(Gravity.CENTER_VERTICAL);
+        toggle.setMinHeight(dp(72));
+        toggle.setPaddingRelative(dp(16), dp(12), dp(16), dp(12));
+        toggle.setCompoundDrawablesRelative(icon(resource), null, null, null);
+        toggle.setCompoundDrawablePadding(dp(16));
+        toggle.setSwitchPadding(dp(16));
         toggle.setChecked(key == null ? initial : prefs.getBoolean(key, false));
-        contents.addView(toggle, new LinearLayout.LayoutParams(-1, -2));
-        text(contents, note, com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+        group.addView(toggle, new LinearLayout.LayoutParams(-1, -2));
         if (key != null) toggle.setOnCheckedChangeListener((button, checked) -> {
             prefs.edit().putBoolean(key, checked).apply();
             ((ModuleApp) getApplication()).sync();
+            if (!"diagnostics".equals(key))
+                Snackbar.make(root, "重新启动 Gboard 后生效", Snackbar.LENGTH_SHORT).show();
         });
         return toggle;
+    }
+    private static final class Row {
+        final LinearLayout view;
+        final MaterialTextView title, summary;
+        Row(LinearLayout view, MaterialTextView title, MaterialTextView summary) {
+            this.view = view; this.title = title; this.summary = summary;
+        }
+    }
+    private Row row(LinearLayout group, String title, String summary, int resource, Runnable action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(dp(72));
+        row.setPaddingRelative(dp(16), dp(12), dp(16), dp(12));
+        ImageView image = new ImageView(this);
+        image.setImageDrawable(icon(resource));
+        image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(24), dp(24));
+        imageParams.setMarginEnd(dp(16));
+        row.addView(image, imageParams);
+        LinearLayout labels = column();
+        MaterialTextView headline = label(title, com.google.android.material.R.style.TextAppearance_Material3_BodyLarge,
+                com.google.android.material.R.attr.colorOnSurface);
+        MaterialTextView supporting = label(summary, com.google.android.material.R.style.TextAppearance_Material3_BodyMedium,
+                com.google.android.material.R.attr.colorOnSurfaceVariant);
+        labels.addView(headline);
+        labels.addView(supporting);
+        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+        if (action != null) {
+            ImageView chevron = new ImageView(this);
+            chevron.setImageDrawable(icon(R.drawable.ic_chevron));
+            chevron.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            LinearLayout.LayoutParams trailing = new LinearLayout.LayoutParams(dp(24), dp(24));
+            trailing.setMarginStart(dp(16));
+            row.addView(chevron, trailing);
+            TypedValue background = new TypedValue();
+            getTheme().resolveAttribute(android.R.attr.selectableItemBackground, background, true);
+            row.setBackgroundResource(background.resourceId);
+            row.setFocusable(true);
+            row.setOnClickListener(v -> action.run());
+        }
+        group.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        return new Row(row, headline, supporting);
+    }
+    private void refreshStatus() {
+        if (frameworkSummary == null) return;
+        setTextIfChanged(frameworkSummary, ModuleApp.connected() ? "已连接 LSPosed" : "等待 LSPosed 服务连接");
+        boolean error = CloudRuntimeStatus.unsupported(this);
+        String report = CloudRuntimeStatus.report(this);
+        setTextIfChanged(compatibilityTitle, error
+                ? (report.contains("不支持该版本 Gboard") ? "不支持该版本 Gboard" : "适配或初始化异常")
+                : "适配与运行状态");
+        compatibilityTitle.setTextColor(color(error ? com.google.android.material.R.attr.colorError
+                : com.google.android.material.R.attr.colorOnSurface));
+        setTextIfChanged(compatibilitySummary, error ? "点按查看详细状态" : "查看 Gboard 适配和 Hook 详情");
+        if (detailText != null) setTextIfChanged(detailText,
+                ((ModuleApp) getApplication()).configurationStatus() + "\n\n" + report);
+    }
+    private void setTextIfChanged(TextView view, String text) {
+        if (!text.contentEquals(view.getText())) view.setText(text);
+    }
+    private void showRuntimeDetails() {
+        ScrollView scroll = new ScrollView(this);
+        MaterialTextView text = label("", com.google.android.material.R.style.TextAppearance_Material3_BodyMedium,
+                com.google.android.material.R.attr.colorOnSurface);
+        text.setTextIsSelectable(true);
+        text.setPadding(dp(24), dp(8), dp(24), dp(16));
+        scroll.addView(text);
+        detailText = text;
+        refreshStatus();
+        new MaterialAlertDialogBuilder(this).setTitle("适配与运行状态")
+                .setView(scroll).setPositiveButton("关闭", null)
+                .setOnDismissListener(dialog -> detailText = null).show();
+    }
+    private void confirmRestart() {
+        new MaterialAlertDialogBuilder(this).setTitle("重启 Gboard？")
+                .setMessage("将强制停止 Gboard，未提交的输入内容可能丢失。随后请手动唤起键盘。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("重启", (dialog, which) -> {
+                    ((ModuleApp) getApplication()).sync();
+                    restartAction.setEnabled(false);
+                    new Thread(() -> {
+                        String result;
+                        try {
+                            java.lang.Process process = new ProcessBuilder("su", "-c",
+                                    "am force-stop com.google.android.inputmethod.latin").start();
+                            boolean done = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS);
+                            if (!done) { process.destroy(); result = "Root 请求超时，可从系统设置强制停止 Gboard。"; }
+                            else result = process.exitValue() == 0 ? "请重新唤起 Gboard。" : "Root 停止失败。";
+                        } catch (Exception error) { result = "无法执行 Root 停止：" + error.getClass().getSimpleName(); }
+                        String message = result;
+                        runOnUiThread(() -> {
+                            if (isDestroyed()) return;
+                            restartAction.setEnabled(true);
+                            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                        });
+                    }, "gboard-restart").start();
+                }).show();
     }
     private ComponentName launcher() { return new ComponentName(this, getPackageName() + ".Launcher"); }
     private boolean isLauncherHidden() {
@@ -188,14 +351,13 @@ public final class SettingsActivity extends AppCompatActivity {
     }
     private void setLauncherHidden(boolean hidden) {
         try {
-            getPackageManager().setComponentEnabledSetting(launcher(),
-                    hidden ? PackageManager.COMPONENT_ENABLED_STATE_DISABLED : PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            getPackageManager().setComponentEnabledSetting(launcher(), hidden
+                    ? PackageManager.COMPONENT_ENABLED_STATE_DISABLED : PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                     PackageManager.DONT_KILL_APP);
-            Toast.makeText(this, hidden ? "桌面图标已隐藏；可从 LSPosed 打开设置" : "桌面图标已恢复，桌面可能稍后刷新", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, hidden ? "桌面图标已隐藏，可从 LSPosed 打开设置" : "桌面图标已恢复", Toast.LENGTH_LONG).show();
         } catch (RuntimeException error) {
             Toast.makeText(this, "无法修改桌面图标：" + error.getClass().getSimpleName(), Toast.LENGTH_LONG).show();
         }
         refreshLauncher();
     }
 }
-
