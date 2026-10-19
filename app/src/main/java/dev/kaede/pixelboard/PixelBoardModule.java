@@ -254,6 +254,8 @@ public final class PixelBoardModule extends XposedModule {
             PcsRpcErrorMetadata.Binding errors = new PcsRpcErrorMetadata.Binding(
                     Class.forName("mhu", false, loader), Class.forName("mhs", false, loader),
                     Class.forName("mhp", false, loader), Class.forName("mfz", false, loader));
+            PcsStatusDetails.TrailersBinding details = new PcsStatusDetails.TrailersBinding(
+                    Class.forName("mfz", false, loader));
             Class<?> futureClass = Class.forName("kmw", false, loader);
             Method listener = futureClass.getMethod("c", Runnable.class, java.util.concurrent.Executor.class);
             Method rpc = Class.forName("mzd", false, loader).getDeclaredMethod("a",
@@ -290,6 +292,7 @@ public final class PixelBoardModule extends XposedModule {
                     Runnable completion = () -> {
                         if (!future.isDone()) return;
                         String line;
+                        String detailLine = null;
                         try {
                             future.get(); // Listener runs only on completion; response body is never inspected.
                             line = "rpc=OK response_body=not_inspected";
@@ -297,6 +300,10 @@ public final class PixelBoardModule extends XposedModule {
                             try { line = errors.describe(error.getCause()); }
                             catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
                                 line = "rpc=UNKNOWN error_metadata=unavailable";
+                            }
+                            try { detailLine = errors.describeDetails(error.getCause(), details); }
+                            catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                                detailLine = "details=OBSERVER_UNAVAILABLE";
                             }
                         } catch (java.util.concurrent.CancellationException error) {
                             line = "rpc=CANCELLED";
@@ -309,6 +316,10 @@ public final class PixelBoardModule extends XposedModule {
                         try {
                             Log.i(TAG, "PCS_MANIFEST_RESULT id=" + requestId + " " + line);
                             recordStatus(context, "PCS_MANIFEST_RESULT", "id=" + requestId + " " + line);
+                            if (detailLine != null) {
+                                Log.i(TAG, "PCS_MANIFEST_DETAILS id=" + requestId + " " + detailLine);
+                                recordStatus(context, "PCS_MANIFEST_DETAILS", "id=" + requestId + " " + detailLine);
+                            }
                         } catch (RuntimeException | LinkageError ignored) { }
                     };
                     try {

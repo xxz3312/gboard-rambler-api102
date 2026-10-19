@@ -4,7 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Set;
 
-/** Does not emit exception messages, trailers, tokens, keys or response bodies. */
+/** Does not emit exception messages, raw trailers, tokens, keys or response bodies. */
 final class PcsRpcErrorMetadata {
     private static final Set<String> CODES = Set.of("OK", "CANCELLED", "UNKNOWN", "INVALID_ARGUMENT", "DEADLINE_EXCEEDED", "NOT_FOUND", "ALREADY_EXISTS", "PERMISSION_DENIED", "RESOURCE_EXHAUSTED", "FAILED_PRECONDITION", "ABORTED", "OUT_OF_RANGE", "UNIMPLEMENTED", "INTERNAL", "UNAVAILABLE", "DATA_LOSS", "UNAUTHENTICATED");
     static final class Binding {
@@ -37,6 +37,15 @@ final class PcsRpcErrorMetadata {
                 }
             }
             return "rpc=UNKNOWN cause=" + (error == null ? "none" : safeClass(error.getClass()));
+        }
+        String describeDetails(Throwable error, PcsStatusDetails.TrailersBinding reader) throws ReflectiveOperationException {
+            Throwable t=error;
+            for(int i=0;t!=null && i<8;i++,t=t.getCause()) {
+                if(errorType.isInstance(t))return reader.describe(trailers.get(t));
+                if("io.grpc.StatusException".equals(t.getClass().getName()))
+                    return reader.describe(t.getClass().getMethod("getTrailers").invoke(t));
+            }
+            return "details=NO_RPC_STATUS";
         }
     }
     private static String safeClass(Class<?> type) {
