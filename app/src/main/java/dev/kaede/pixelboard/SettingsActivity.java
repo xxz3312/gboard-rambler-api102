@@ -183,7 +183,7 @@ public final class SettingsActivity extends AppCompatActivity {
     }
     private void section(LinearLayout list, String title) {
         MaterialTextView label = label(title, com.google.android.material.R.style.TextAppearance_Material3_LabelLarge,
-                com.google.android.material.R.attr.colorPrimary);
+                androidx.appcompat.R.attr.colorPrimary);
         label.setAccessibilityHeading(true);
         label.setPadding(dp(16), dp(24), dp(16), dp(8));
         list.addView(label);
@@ -293,7 +293,7 @@ public final class SettingsActivity extends AppCompatActivity {
         setTextIfChanged(compatibilityTitle, error
                 ? (report.contains("不支持该版本 Gboard") ? "不支持该版本 Gboard" : "适配或初始化异常")
                 : "适配与运行状态");
-        compatibilityTitle.setTextColor(color(error ? com.google.android.material.R.attr.colorError
+        compatibilityTitle.setTextColor(color(error ? androidx.appcompat.R.attr.colorError
                 : com.google.android.material.R.attr.colorOnSurface));
         setTextIfChanged(compatibilitySummary, error ? "点按查看详细状态" : "查看 Gboard 适配和 Hook 详情");
         if (detailText != null) setTextIfChanged(detailText,
