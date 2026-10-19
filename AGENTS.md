@@ -9,3 +9,4 @@
 - Display the released APK SHA-256 in README instead of attaching a checksum file.
 - Keep R8 code shrinking and resource shrinking enabled for Release builds.
 - Preserve license notices in the APK and source repository.
+- Release descriptions must be only one or two concise Chinese sentences describing the changes. Keep build logs, checksums, installation instructions, and development history out of Release descriptions; include a material unverified status briefly when relevant.
