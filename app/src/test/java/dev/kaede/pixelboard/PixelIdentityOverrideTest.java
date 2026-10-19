@@ -86,4 +86,30 @@ public class PixelIdentityOverrideTest {
                 PixelIdentityOverride.apply(GBOARD, true, fields).outcome);
         assertEquals("Google", fields.values.get("MANUFACTURER"));
     }
+    @Test public void writeDeniedBeforeMutationDoesNotAttemptRestoreOrClaimPartialChange() {
+        FakeFields fields = new FakeFields() {
+            @Override public void set(String name, String value) throws Exception {
+                writes++;
+                throw new IllegalAccessException();
+            }
+        };
+        Map<String, String> original = new HashMap<>(fields.values);
+        assertEquals(PixelIdentityOverride.Outcome.FAILED_UNCHANGED,
+                PixelIdentityOverride.apply(GBOARD, true, fields).outcome);
+        assertEquals(1, fields.writes);
+        assertEquals(original, fields.values);
+    }
+    @Test public void restoreThatThrowsAfterRestoringIsJudgedByReadback() {
+        FakeFields fields = new FakeFields() {
+            @Override public void set(String name, String value) throws Exception {
+                super.set(name, value);
+                if ("MODEL".equals(name)) throw new IllegalAccessException();
+            }
+        };
+        Map<String, String> original = new HashMap<>(fields.values);
+        assertEquals(PixelIdentityOverride.Outcome.FAILED_RESTORED,
+                PixelIdentityOverride.apply(GBOARD, true, fields).outcome);
+        assertEquals(original, fields.values);
+    }
 }
+

@@ -273,6 +273,31 @@ Version-bind live queries to the requesting app version, and invalidate stored
 query state when the explicit reload begins, preventing stale replies from being
 presented as the current query after an upgrade or process reload.
 
+## 0.1.19 Android final-field compatibility and rollback reporting
+
+The 0.1.18 device report showed IllegalAccessException. A denied first write and
+denied restore writes previously produced FAILED_PARTIAL even when no value had
+changed. Rollback now only touches attempted fields whose readback differs from
+the original. Final readback determines FAILED_UNCHANGED, FAILED_RESTORED or
+FAILED_PARTIAL; a restore exception alone no longer implies partial mutation.
+
+When normal reflection is denied, the Gboard-only writer resolves the platform's
+jdk.internal.misc.Unsafe (sun.misc on older runtimes), staticFieldBase and
+staticFieldOffset, and volatile reference accessors. All five allowlisted static
+String fields must resolve and read identically through both reflection and the
+derived slot before any fallback write. No guessed offsets, absolute addresses,
+primitive field writes or arbitrary field names are allowed. Failure retains the
+normal readback/rollback reporting. A missing runtime interface fails closed.
+Tests exercise final-field writes on JVM fixtures, allowlist/type rejection and
+the denied-first-write regression; actual ART/OEM behavior still needs a device
+test. This does not modify native/system property readers or cached Gboard checks.
+
+Identity events now show original model/device, all five current identity fields
+and the selected writer. An existing GM45K/grizzly identity was observed before
+the experiment succeeded; the report does not attribute that identity to this
+module or assume it establishes valid Pixel hardware attestation. The V2 server
+authentication failure is independent and remains unresolved.
+
 ## 0.1.18 Gboard-only Pixel identity experiment
 
 The `gboard_pixel_identity` switch defaults off and is effective only when both
@@ -347,5 +372,6 @@ metadata above the rolling event history. These are timestamped historical recor
 with PIDs, not a claim that a backend process is currently alive.
 
 The explicit Root reload report now records before/after PIDs for each of the three targets, rather than only Gboard, so an exit code cannot conceal an unchanged PCS process.
+
 
 

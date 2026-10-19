@@ -41,23 +41,35 @@ public final class PixelIdentityOverride {
         } catch (Exception | LinkageError e) {
             return new Result(Outcome.FAILED_UNCHANGED, e.getClass().getSimpleName());
         }
+        java.util.Set<String> attempted = new java.util.LinkedHashSet<>();
         try {
-            for (Map.Entry<String, String> entry : profile().entrySet())
+            for (Map.Entry<String, String> entry : profile().entrySet()) {
+                if (java.util.Objects.equals(original.get(entry.getKey()), entry.getValue())) continue;
+                attempted.add(entry.getKey());
                 fields.set(entry.getKey(), entry.getValue());
+            }
             if (!matches(fields)) throw new IllegalStateException("readback");
             return new Result(Outcome.APPLIED, "");
         } catch (Exception | LinkageError e) {
-            boolean restored = true;
-            for (Map.Entry<String, String> entry : original.entrySet()) {
-                try { fields.set(entry.getKey(), entry.getValue()); }
-                catch (Exception | LinkageError ignored) { restored = false; }
+            boolean observedChange = false;
+            for (String name : attempted) {
+                boolean needsRestore;
+                try { needsRestore = !java.util.Objects.equals(original.get(name), fields.get(name)); }
+                catch (Exception | LinkageError ignored) { needsRestore = true; }
+                if (!needsRestore) continue;
+                observedChange = true;
+                try { fields.set(name, original.get(name)); }
+                catch (Exception | LinkageError ignored) { /* Judge restoration by final readback. */ }
             }
+            boolean restored = true;
             for (Map.Entry<String, String> entry : original.entrySet()) {
                 try { if (!java.util.Objects.equals(entry.getValue(), fields.get(entry.getKey()))) restored = false; }
                 catch (Exception | LinkageError ignored) { restored = false; }
             }
-            return new Result(restored ? Outcome.FAILED_RESTORED : Outcome.FAILED_PARTIAL,
+            return new Result(restored ? (observedChange ? Outcome.FAILED_RESTORED : Outcome.FAILED_UNCHANGED)
+                    : Outcome.FAILED_PARTIAL,
                     e.getClass().getSimpleName());
         }
     }
 }
+
