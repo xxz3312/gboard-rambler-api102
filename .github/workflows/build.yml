@@ -36,19 +36,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test feature-only module and installation guards
         run: python3 -m unittest discover -s experiments/aicore-features/tests -v
-      - name: Package optional SM8850 root module
+      - name: Check direct-install package root
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile, ZIP_DEFLATED
-          root = Path("experiments/aicore-features/root-module")
-          Path("dist").mkdir(exist_ok=True)
-          with ZipFile("dist/AICore-SM8850-Features-0.1.0.zip", "w", ZIP_DEFLATED) as archive:
-              for path in sorted(root.rglob("*")):
-                  if path.is_file():
-                      archive.write(path, path.relative_to(root))
-          PY
+          test -f experiments/aicore-features/root-module/module.prop
+          test -f experiments/aicore-features/root-module/customize.sh
+          test -f experiments/aicore-features/root-module/system/product/etc/sysconfig/pixelboard_aicore_sm8850.xml
+          if find experiments/aicore-features/root-module -name '*.zip' | grep -q .; then
+            echo "Nested ZIP found in module root"; exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
-          name: aicore-sm8850-features-0.1.0
-          path: dist/AICore-SM8850-Features-0.1.0.zip
+          # Upload the contents, not a ZIP: GitHub's artifact ZIP IS the module.
+          name: AICore-SM8850-Features-0.1.1-INSTALL-DIRECTLY
+          path: experiments/aicore-features/root-module/
+          if-no-files-found: error
+

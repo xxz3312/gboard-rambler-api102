@@ -1,6 +1,9 @@
 # SM8850 AICore feature declaration experiment
 
-Install this ZIP in KernelSU's module manager, then reboot. Current KernelSU
+Download the `AICore-SM8850-Features-0.1.1-INSTALL-DIRECTLY` Actions artifact.
+Install the downloaded ZIP directly in KernelSU's module manager, then reboot.
+The artifact contents are the module itself: `module.prop` is at ZIP root.
+Do not extract it or select a ZIP containing another module ZIP. Current KernelSU
 requires a system-mounting metamodule; older implementations may provide the
 mount internally. Do not extract or copy files to the real product partition.
 The installer accepts only `ro.soc.model=SM8850`, API 34+, and Android boot mode.
