@@ -34,7 +34,15 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
                 + " 扫描文本=" + local.getBoolean("scan_text", false)
                 + " 截图建议=" + local.getBoolean("screenshot_suggestions", false)
                 + " 圆角键=" + local.getBoolean("rounded_keys", false)
+                + upstreamConfiguration(local)
                 + "\n服务连接：" + connected() + "\n" + lastSync;
+    }
+
+    private static String upstreamConfiguration(SharedPreferences prefs) {
+        StringBuilder summary = new StringBuilder();
+        for (UpstreamFeature feature : UpstreamFeature.values())
+            summary.append("\n").append(feature.title).append("=").append(prefs.getBoolean(feature.key, false));
+        return summary.toString();
     }
 
     public void sync() {
@@ -43,15 +51,17 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
         try {
             SharedPreferences local = getSharedPreferences(FeatureConfig.GROUP, MODE_PRIVATE);
             SharedPreferences remote = current.getRemotePreferences(FeatureConfig.GROUP);
-            boolean success = remote.edit()
+            SharedPreferences.Editor editor = remote.edit()
                     .putBoolean("rambler", local.getBoolean("rambler", false))
                     .remove("spellchecker")
                     .putBoolean("diagnostics", local.getBoolean("diagnostics", false))
                     .putBoolean("writing_tools", local.getBoolean("writing_tools", false))
                     .putBoolean("scan_text", local.getBoolean("scan_text", false))
                     .putBoolean("screenshot_suggestions", local.getBoolean("screenshot_suggestions", false))
-                    .putBoolean("rounded_keys", local.getBoolean("rounded_keys", false))
-                    .commit();
+                    .putBoolean("rounded_keys", local.getBoolean("rounded_keys", false));
+            for (UpstreamFeature feature : UpstreamFeature.values())
+                editor.putBoolean(feature.key, local.getBoolean(feature.key, false));
+            boolean success = editor.commit();
             lastSync = success ? "最近一次同步成功（不代表 Hook 已加载）。" : "配置同步失败。";
             Log.i(TAG, "Remote preferences sync=" + success);
         } catch (RuntimeException e) {

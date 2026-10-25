@@ -7,7 +7,7 @@ import android.os.Process;
 
 /** Metadata only. Receiving app authenticates the sender through Android 14+ identity. */
 public final class CloudRuntimeStatus extends BroadcastReceiver {
-    public static final String VERSION="0.1.32";
+    public static final String VERSION="0.1.33";
     private static final String PREF="cloud_runtime_status";
     public static void send(Context context,String event,String detail) {
         if(context==null||Build.VERSION.SDK_INT<34)return;
@@ -27,7 +27,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
             int uid=context.getPackageManager().getPackageUid("com.google.android.inputmethod.latin",0);
             if(uid!=getSentFromUid()||!VERSION.equals(intent.getStringExtra("version")))return;
             String event=intent.getStringExtra("event");
-            if(!"COMPAT".equals(event)&&!"INIT".equals(event)&&!"GETTER".equals(event)&&!"FLAG".equals(event)&&!"HOOKS".equals(event)&&!"ERROR".equals(event)&&!"EXTRAS".equals(event)&&!"EXTRA_FLAG".equals(event))return;
+            if(!"COMPAT".equals(event)&&!"INIT".equals(event)&&!"GETTER".equals(event)&&!"FLAG".equals(event)&&!"HOOKS".equals(event)&&!"ERROR".equals(event)&&!"EXTRAS".equals(event)&&!"EXTRA_FLAG".equals(event)&&!"UPSTREAM".equals(event))return;
             String detail=intent.getStringExtra("detail");
             if(detail==null||detail.length()>480)return;
             android.content.SharedPreferences prefs=context.getSharedPreferences(PREF,0);
@@ -69,7 +69,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
         else if(hooks.isEmpty())out.append("等待 Hook 安装结果；定位成功不等于已安装。\n");
         else if(!capability.contains("false"))out.append("Hook 安装检查完成；云端功能仍需实际操作验证。\n");
         out.append("Gboard PID=").append(p.getInt("pid",-1)).append("\n");
-        for(String event:new String[]{"COMPAT","INIT","GETTER","HOOKS","ERROR","FLAG","EXTRAS","EXTRA_FLAG"}) {
+        for(String event:new String[]{"COMPAT","INIT","GETTER","HOOKS","ERROR","FLAG","EXTRAS","EXTRA_FLAG","UPSTREAM"}) {
             String detail=p.getString(event,"");
             if(!detail.isEmpty()) {
                 long time=p.getLong(event+"_when",0);
