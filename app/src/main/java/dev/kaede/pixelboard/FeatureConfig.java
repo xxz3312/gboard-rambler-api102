@@ -31,6 +31,7 @@ public final class FeatureConfig {
         state = new Snapshot(Collections.emptyMap());
         try {
             remote = module.getRemotePreferences(GROUP);
+            reload(remote);
             listener = (prefs, key) -> reload(prefs);
             remote.registerOnSharedPreferenceChangeListener(listener);
             reload(remote);
@@ -56,7 +57,8 @@ public final class FeatureConfig {
     public static boolean extrasRequested() {
         Snapshot current = state;
         if (current.has("scan_text") || current.has("screenshot_suggestions") || current.has("rounded_keys")) return true;
-        for (UpstreamFeature feature : UpstreamFeature.values()) if (current.has(feature.key)) return true;
+        for (UpstreamFeature feature : UpstreamFeature.values())
+            if (feature.usesFlags() && current.has(feature.key)) return true;
         return false;
     }
     public static boolean ramblerRequested() { return state.has("rambler"); }

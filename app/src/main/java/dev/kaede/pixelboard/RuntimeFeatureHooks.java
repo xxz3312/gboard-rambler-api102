@@ -18,25 +18,23 @@ final class RuntimeFeatureHooks {
             module.hook(getter).intercept(chain -> {
                 // Keep original exceptions and type validation before applying a read-only override.
                 Object original = chain.proceed();
-                String retention = FeatureConfig.retention();
-                if (ClipboardRetention.NATIVE_KEY.equals(chain.getArgs().get(0)) && !"stock".equals(retention))
-                    return retention;
-                return original;
+                return RetentionReadScope.override(chain.getArgs().get(0), original, FeatureConfig.retention());
             });
-            preference = "installed(native-key)";
+            preference = "installed(scoped-native-key)";
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
             Log.w(TAG, "Clipboard preference contract unavailable", error);
         }
         try {
-            Method target = RuntimeHookResolver.retention(context, loader);
-            module.hook(target).intercept(chain -> {
-                long original = (Long) chain.proceed();
-                return ClipboardRetention.millis(FeatureConfig.retention(), original);
+            RuntimeHookResolver.RetentionTarget target = RuntimeHookResolver.retention(context, loader);
+            module.hook(target.method).intercept(chain -> {
+                Object original;
+                try (RetentionReadScope ignored = new RetentionReadScope()) { original = chain.proceed(); }
+                return target.duration ? ClipboardRetention.millis(FeatureConfig.retention(), (Long) original) : original;
             });
-            calculation = "installed(semantic-ms)";
+            calculation = target.duration ? "installed(semantic-ms)" : "installed(semantic-reader)";
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
             calculation = "skipped:"+error.getClass().getSimpleName();
-            Log.w(TAG, "No unique retention calculation; native preference path only", error);
+            Log.w(TAG, "No unique retention calculation; retention override inactive", error);
         }
         try {
             Method draw = RuntimeHookResolver.candidateDraw(loader);

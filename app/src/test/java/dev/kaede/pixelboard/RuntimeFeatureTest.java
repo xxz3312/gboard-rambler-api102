@@ -56,6 +56,22 @@ public final class RuntimeFeatureTest {
         assertEquals(2_592_000_000L, ClipboardRetention.millis("720",123L));
         assertEquals(3_153_600_000_000L, ClipboardRetention.millis("876000",123L));
     }
+    @Test public void nativeSettingsReadsAreNeverOverriddenOutsideCalculationScope() {
+        String key=ClipboardRetention.NATIVE_KEY;
+        assertEquals("24",RetentionReadScope.override(key,"24","720"));
+        try {
+            try (RetentionReadScope scope=new RetentionReadScope()) {
+                assertEquals("720",RetentionReadScope.override(key,"24","720"));
+                assertEquals("24",RetentionReadScope.override(key,"24","stock"));
+                assertEquals("24",RetentionReadScope.override("other","24","720"));
+                try (RetentionReadScope nested=new RetentionReadScope()) { assertTrue(RetentionReadScope.active()); }
+                assertTrue(RetentionReadScope.active());
+                throw new IllegalArgumentException("host error");
+            }
+        } catch (IllegalArgumentException expected) {}
+        assertFalse(RetentionReadScope.active());
+        assertEquals("24",RetentionReadScope.override(key,"24","720"));
+    }
     @Test public void liveReloadSupportsEnablingAfterStartupAndDisabling() {
         Context context = RuntimeEnvironment.getApplication();
         android.content.SharedPreferences prefs = context.getSharedPreferences("live_test",0);

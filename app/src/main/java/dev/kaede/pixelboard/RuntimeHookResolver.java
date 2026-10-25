@@ -33,24 +33,35 @@ final class RuntimeHookResolver {
                 || Modifier.isAbstract(method.getModifiers()) || Modifier.isNative(method.getModifiers()))
             throw new IllegalArgumentException("Not a retention duration getter");
     }
-    static Method retention(Context context, ClassLoader loader) throws ReflectiveOperationException {
+    static final class RetentionTarget {
+        final Method method;
+        final boolean duration;
+        RetentionTarget(Method method, boolean duration) {
+            if (duration) validateRetention(method);
+            if (Modifier.isAbstract(method.getModifiers()) || Modifier.isNative(method.getModifiers()))
+                throw new IllegalArgumentException("No runtime implementation");
+            this.method=method; this.duration=duration;
+            method.setAccessible(true);
+        }
+    }
+    static RetentionTarget retention(Context context, ClassLoader loader) throws ReflectiveOperationException {
         SharedPreferences cache = context.getSharedPreferences("pixelboard_runtime_targets", 0);
-        String fingerprint = "retention-v1|"+GboardResolver.fingerprint(context);
+        String fingerprint = "retention-v2-scoped|"+GboardResolver.fingerprint(context);
         if (fingerprint.equals(cache.getString("key", ""))) {
+            if (cache.getBoolean("missing", false)) throw new IllegalArgumentException("Cached missing/ambiguous target");
             try {
-                Method method = Class.forName(cache.getString("owner", ""), false, loader)
-                        .getDeclaredMethod(cache.getString("name", ""));
-                validateRetention(method);
-                method.setAccessible(true);
-                return method;
+                String args=cache.getString("args", "");
+                Method method = new TargetMethod(cache.getString("owner", ""), cache.getString("name", ""),
+                        cache.getString("return", ""), args.isEmpty()?new String[0]:args.split(",")).resolve(loader);
+                return new RetentionTarget(method, cache.getBoolean("duration", false));
             } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
                 cache.edit().clear().apply();
             }
         }
-        List<Method> matches = new ArrayList<>();
+        List<RetentionTarget> durations = new ArrayList<>(), readers = new ArrayList<>();
         try (HostDex dex = new HostDex(context)) {
             for (MethodData data : dex.findMethod(FindMethod.create().matcher(MethodMatcher.create()
-                    .returnType("long").paramCount(0).usingStrings(ClipboardRetention.NATIVE_KEY)))) {
+                    .usingStrings(ClipboardRetention.NATIVE_KEY)))) {
                 boolean convertsHours = false, clock = false, readsPreference = false;
                 for (MethodData call : data.getInvokes()) {
                     if (call.getClassName().equals("java.util.concurrent.TimeUnit")
@@ -62,18 +73,26 @@ final class RuntimeHookResolver {
                             && call.getParamTypeNames().equals(Arrays.asList("java.lang.String", "java.lang.String")))
                         readsPreference = true;
                 }
-                // Never replace an epoch cutoff or a generic long-returning cleanup method.
-                if (!convertsHours || clock || !readsPreference) continue;
+                if (!convertsHours || !readsPreference || data.getMethodName().startsWith("<")) continue;
                 Method method = data.getMethodInstance(loader);
-                validateRetention(method);
-                matches.add(method);
+                boolean duration = !clock && method.getReturnType()==long.class && method.getParameterCount()==0;
+                RetentionTarget target = new RetentionTarget(method, duration);
+                if (duration) durations.add(target); else readers.add(target);
             }
         }
-        Method method = GboardResolver.unique(matches);
-        method.setAccessible(true);
+        List<RetentionTarget> matches = durations.isEmpty()?readers:durations;
+        if (matches.size()!=1) {
+            cache.edit().clear().putString("key", fingerprint).putBoolean("missing", true).apply();
+            throw new IllegalArgumentException("Retention target count="+matches.size());
+        }
+        RetentionTarget target = matches.get(0);
+        Method method=target.method;
+        List<String> args=new ArrayList<>();
+        for (Class<?> type:method.getParameterTypes()) args.add(type.getName());
         cache.edit().clear().putString("key", fingerprint)
-                .putString("owner", method.getDeclaringClass().getName())
-                .putString("name", method.getName()).apply();
-        return method;
+                .putString("owner", method.getDeclaringClass().getName()).putString("name", method.getName())
+                .putString("return", method.getReturnType().getName()).putString("args", String.join(",", args))
+                .putBoolean("duration", target.duration).apply();
+        return target;
     }
 }

@@ -15,8 +15,8 @@
 
 1. 共享 flag getter 继续按语义字符串、构造签名和字段类型唯一匹配；覆盖值必须与原始值同类型。新增所有布尔开关默认关闭。
 2. HostDex 联合扫描基础 APK 和所有 split APK；同一描述符去重，匹配不唯一时跳过。基础包或 split 的路径、大小、时间及解析器修订变化使缓存失效；缓存命中后重新核对描述符。
-3. 剪贴板优先使用 Android SharedPreferences.getString 的原生稳定键 clipboard_history_retention，运行时只读覆盖并开启 extended flag，不写入 Gboard 偏好、数据库或滑块字段。模块设置页提供选择，避免 K/L/b/d/ap 等混淆字段依赖。
-4. 可选时限计算方法必须同时具备：原生偏好键、无参数 long 返回、getString(String,String)、TimeUnit.toMillis(long)，且不直接调用 System.currentTimeMillis。唯一匹配后才覆盖毫秒结果，拒绝直接含时间戳计算的目标。无法定位时仍保留原生偏好路径，RUNTIME_HOOKS 明示 calculation=skipped。**这不保证未来版本没有隐藏上限或其他清理路径，真实清理周期必须实测。**
+3. 剪贴板优先使用 Android SharedPreferences.getString 的原生稳定键 clipboard_history_retention，仅在已验证的运行时计算作用域内只读覆盖并开启 extended flag，不写入 Gboard 偏好、数据库或滑块字段。模块设置页提供选择，避免 K/L/b/d/ap 等混淆字段依赖。
+4. 时限计算必须同时具备原生偏好键、getString(String,String) 和 TimeUnit.toMillis(long)。优先唯一的无参数 long 返回且不直接调用 System.currentTimeMillis 的时长 getter，覆盖毫秒结果；否则尝试唯一的运行时计算调用，将原生偏好覆盖限定在此调用内部，保留其原始返回结果，绝不将时长赋给时间戳。原生设置页读取不进入该作用域，防止滑块读到越界值。无法定位时保留 Gboard 原样，RUNTIME_HOOKS 明示 calculation=skipped；负结果同样按安装指纹缓存。**这不保证未来版本没有隐藏上限或其他清理路径，真实清理周期必须实测。**
 5. 候选控件采用未混淆的公开控件类名与 Android onDraw(Canvas) 契约，并校验 TextView 继承关系。类名或绘制契约变化则独立跳过，不扩大到所有 TextView、Canvas 或所有表情字符。Paint 的短暂 Hook 仅在该控件的线程局部绘制作用域内修改 TextPaint，退出作用域恢复 alpha。
 6. 所有可解析的策略 Hook 在启动时安装，开关全关也能随后启用。远程 SharedPreferences 监听器强引用保存；每次回调从 getAll 生成不可变快照，运行时不进行跨进程配置查询。同步后新一次 getter/绘制会读取新策略；**已被宿主缓存的 flag、界面、模型和清理任务可能仍需重启**。未反射调用未知界面重载函数。
 7. 每个可选 Hook 独立捕获解析/安装失败；运行详情新增 RUNTIME_HOOKS，区分原生偏好、毫秒计算、候选绘制安装情况。不以 Gboard 版本号放宽匹配，不承诺所有未来版本都兼容。

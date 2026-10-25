@@ -70,6 +70,7 @@ public enum UpstreamFeature {
         for (UpstreamFeature feature : values()) if (feature.overrides.containsKey(name)) return true;
         return false;
     }
+    boolean usesFlags() { return !overrides.isEmpty(); }
 
     static Object transform(String name, Object original, Predicate<UpstreamFeature> enabled) {
         if (name == null || original == null) return original;
