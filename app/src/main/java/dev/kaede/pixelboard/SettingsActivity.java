@@ -1,6 +1,8 @@
 package dev.kaede.pixelboard;
 
 import android.content.ComponentName;
+import android.content.Intent;
+import android.net.Uri;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -44,6 +46,11 @@ public final class SettingsActivity extends AppCompatActivity {
     private MaterialTextView frameworkSummary, compatibilityTitle, compatibilitySummary;
     private View restartAction;
     private TextView detailText;
+    private View updateAction;
+    private MaterialTextView updateSummary;
+    private final java.util.concurrent.ExecutorService updateExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private java.util.concurrent.Future<?> updateTask;
+
     private final android.os.Handler statusHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable statusTicker = new Runnable() {
         @Override public void run() {
@@ -62,6 +69,14 @@ public final class SettingsActivity extends AppCompatActivity {
     @Override protected void onPause() {
         statusHandler.removeCallbacks(statusTicker);
         super.onPause();
+    }
+
+    @Override protected void onDestroy() {
+        statusHandler.removeCallbacks(statusTicker);
+        if (updateTask != null) updateTask.cancel(true);
+        updateExecutor.shutdownNow();
+        detailText = null;
+        super.onDestroy();
     }
 
     @Override protected void onCreate(Bundle state) {
@@ -151,6 +166,10 @@ public final class SettingsActivity extends AppCompatActivity {
 
         section(list, "关于");
         LinearLayout about = group(list);
+        Row update = row(about, "检查更新", "当前版本 " + installedVersion(), R.drawable.ic_sync, this::checkForUpdates);
+        updateAction = update.view;
+        updateSummary = update.summary;
+        divider(about);
         row(about, "使用说明", "网络、语言与使用范围", R.drawable.ic_help, () ->
                 new MaterialAlertDialogBuilder(this).setTitle("使用说明")
                         .setMessage("AI 写作工具需要联网，并完成 Gboard 的同意流程。建议先在普通便签中用英语测试；部分应用可能被 Gboard 排除。\n\n开关开启、配置同步或适配成功不代表云端请求成功。修改功能后，请强制停止并重新唤起 Gboard。")
@@ -342,6 +361,66 @@ public final class SettingsActivity extends AppCompatActivity {
                         });
                     }, "gboard-restart").start();
                 }).show();
+    }
+    private String installedVersion() {
+        try {
+            String name = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            return name == null ? CloudRuntimeStatus.VERSION : name;
+        }
+        catch (PackageManager.NameNotFoundException ignored) { return CloudRuntimeStatus.VERSION; }
+    }
+    private void openUpdateUrl(String url) {
+        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
+        catch (android.content.ActivityNotFoundException error) {
+            Snackbar.make(root, "未找到可用的浏览器", Snackbar.LENGTH_LONG).show();
+        }
+    }
+    private void checkForUpdates() {
+        if (updateTask != null && !updateTask.isDone()) return;
+        String current = installedVersion();
+        updateAction.setEnabled(false);
+        updateSummary.setText("正在检查…");
+        updateTask = updateExecutor.submit(() -> {
+            ModuleRelease release = null;
+            String failure = null;
+            try { release = ModuleUpdateChecker.fetch(current); }
+            catch (java.net.SocketTimeoutException error) { failure = "连接超时，请稍后重试"; }
+            catch (java.io.IOException | RuntimeException error) {
+                failure = error instanceof java.io.IOException && error.getMessage() != null
+                        ? error.getMessage() : "无法检查更新，请稍后重试";
+            }
+            ModuleRelease result = release;
+            String message = failure;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                updateAction.setEnabled(true);
+                if (!getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                    updateSummary.setText("当前版本 " + current);
+                    return;
+                }
+                if (result == null) {
+                    updateSummary.setText("检查失败，点按重试");
+                    Snackbar.make(root, message, Snackbar.LENGTH_LONG)
+                            .setAction("发布页", v -> openUpdateUrl("https://github.com/" + ModuleRelease.REPOSITORY + "/releases/latest")).show();
+                    return;
+                }
+                int comparison = ModuleRelease.compare(result.version, current);
+                if (comparison > 0) {
+                    updateSummary.setText("新版本 " + result.version);
+                    new MaterialAlertDialogBuilder(this).setTitle("发现新版本 " + result.version)
+                            .setMessage(result.notes.isEmpty() ? "有新的正式版本可用。" : result.notes)
+                            .setNegativeButton("稍后", null)
+                            .setNeutralButton("查看发布", (dialog, which) -> openUpdateUrl(result.pageUrl))
+                            .setPositiveButton("下载 APK", (dialog, which) -> openUpdateUrl(result.apkUrl)).show();
+                } else if (comparison == 0) {
+                    updateSummary.setText("已是最新正式版 · " + current);
+                    Snackbar.make(root, "当前已是最新版本", Snackbar.LENGTH_SHORT).show();
+                } else {
+                    updateSummary.setText("当前为较新版本 · 正式版 " + result.version);
+                    Snackbar.make(root, "当前版本比最新正式版更新，无需降级", Snackbar.LENGTH_LONG).show();
+                }
+            });
+        });
     }
     private ComponentName launcher() { return new ComponentName(this, getPackageName() + ".Launcher"); }
     private boolean isLauncherHidden() {

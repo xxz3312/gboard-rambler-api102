@@ -29,6 +29,7 @@ public final class RamblerBindings {
         public TargetMethod[] all() { return new TargetMethod[]{layout,setup,create,write,read,defaults}; }
     }
     public static final Profile[] PROFILES = {
+        new Profile("18.5.3", "aC", "aE", "qvt", "nca", "fhv", "hU"),
         new Profile("18.4.1", "aC", "aE", "qou", "mvq", "fde", "hT"),
         new Profile("18.3.1", "aD", "aF", "ahbz", "aaeo", "kcm", "ge"),
         new Profile("18.0.3", "aB", "aD", "qhy", "mqk", "fbl", "hN")

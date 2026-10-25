@@ -29,6 +29,6 @@ with zipfile.ZipFile(sys.argv[1]) as apk:
     assert entry in classes
     for method in ("onModuleLoaded","onPackageReady"):
         assert (entry,method) in methods,method
-    for cls in ("ModuleApp","SettingsActivity","CloudRuntimeStatus","GboardResolver","FeatureConfig"):
+    for cls in ("ModuleApp","SettingsActivity","CloudRuntimeStatus","GboardResolver","FeatureConfig","ModuleRelease","ModuleUpdateChecker","RamblerDictationFilter"):
         assert "Ldev/kaede/pixelboard/"+cls+";" in classes,cls
 print("Shrunk APK entry, callbacks and configuration/status classes verified.")

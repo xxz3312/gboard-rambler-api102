@@ -15,12 +15,8 @@ public final class RamblerFlagPolicy {
             "config_agentic_dictation",
             "enable_jetson_in_toolbar",
             "filter_rambler_contributed_input_view_session",
-            "enable_rambler_toolbar_at_cursor_position",
             "enable_rambler_al_toolbar",
             "enable_rambler_al_toolbar_overflow_menu",
-            "enable_hide_rambler_al_idling_state",
-            "enable_rambler_al_show_hide_new_animation",
-            "enable_rambler_al_teleporting_animation",
             "rambler_motion_with_gradient_color",
             "agentic_dictation_spot_light2",
             "agentic_dictation_new_gi_motion",
@@ -34,12 +30,17 @@ public final class RamblerFlagPolicy {
     public static boolean targeted(String name) {
         return BOOLEAN_FLAGS.contains(name)
                 || "show_rambler_dict_settings".equals(name)
-                || "ad_activation_type".equals(name);
+                || "ad_activation_type".equals(name)
+                || "agentic_dictation_deactivation_delay_ms".equals(name);
     }
     public static Object transform(String name, Object original, Context context) {
-        if (!FeatureConfig.rambler() || name == null || context == null) return original;
-        // Respect explicit opt-out across all flags, including activation type and settings.
-        if (!RamblerSelection.mayExpose(context)) return original;
+        return overrideValue(name, original, FeatureConfig.rambler() && context != null
+                && RamblerSelection.mayExpose(context));
+    }
+    static Object overrideValue(String name, Object original, boolean enabled) {
+        if (!enabled || name == null) return original;
+        if ("agentic_dictation_deactivation_delay_ms".equals(name))
+            return original instanceof Long ? Long.valueOf(0L) : original;
         if ("show_rambler_dict_settings".equals(name))
             return original instanceof Boolean ? Boolean.TRUE : original;
         if ("ad_activation_type".equals(name))

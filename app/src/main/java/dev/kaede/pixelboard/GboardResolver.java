@@ -12,7 +12,7 @@ import org.luckypray.dexkit.result.MethodData;
 
 /** Unique semantic matches; never force a result when signatures are ambiguous. */
 public final class GboardResolver {
-    private static final String REV = "semantic-cloud-1";
+    private static final String REV = "semantic-cloud-2";
     private static final String VOICE = RamblerBindings.VOICE;
     private static final String EXTENSION =
             "com/google/android/apps/inputmethod/libs/agenticdictation/extension/AgenticDictationExtension";
@@ -95,7 +95,8 @@ public final class GboardResolver {
             android.util.Log.w("PixelBoardLS","Semantic resolver failed; verified signatures only",failure);
             // This is a signature fallback, not a blanket version-number allowlist.
             return new Result(knownFlags,knownVoice,knownFlags!=null && knownVoice!=null
-                    && "18.4.1".equals(knownVoice.id),"verified-signature-fallback");
+                    && knownFlags.profile.equals(knownVoice.id)
+                    && ("18.4.1".equals(knownVoice.id) || "18.5.3".equals(knownVoice.id)),"verified-signature-fallback");
         }
     }
     private static String fingerprint(Context context) {

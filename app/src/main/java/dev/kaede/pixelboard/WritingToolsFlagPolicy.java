@@ -18,8 +18,6 @@ public final class WritingToolsFlagPolicy {
             "config_proofread",
             "writing_tools",
             "writing_tools_enable_stable_entrance",
-            "enable_writing_tools_cooperative_mode",
-            "writing_helper_on_selected_text",
             "writing_helper_enable_text_stylization_internal",
             "writing_helper",
             "enable_nga_lab_modeless_smartedit"
@@ -27,6 +25,8 @@ public final class WritingToolsFlagPolicy {
     // Match the upstream default: basic cloud tools, with V2 disabled.
     private static final Set<String> V2_DISABLED = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
+            "enable_writing_tools_cooperative_mode",
+            "writing_helper_on_selected_text",
             "enable_writing_tools_v2",
             "enable_writing_tools_v2_on_toolbar",
             "enable_writing_tools_suggest_style",

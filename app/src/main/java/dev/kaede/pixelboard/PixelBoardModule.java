@@ -93,11 +93,37 @@ public final class PixelBoardModule extends XposedModule {
         FeatureConfig.compatibility(
                 voiceCompatible && (!FeatureConfig.ramblerRequested() || voiceInstalled && getterInstalled),
                 writingCompatible && (!FeatureConfig.writingRequested() || getterInstalled));
+        if (FeatureConfig.rambler()) installDictationFilter(loader);
         if (FeatureConfig.writingTools()) {
             WritingToolsDiagnostics.probe(loader);
             if (FeatureConfig.diagnostics() && verifiedWritingTools184) observeWritingTools184State(loader);
             Log.i(TAG,"Writing Tools basic cloud; V2=false; backend=GBOARD_SERVER; local=false");
         }
+    }
+    private void installDictationFilter(ClassLoader loader) {
+        TargetMethod[] targets = {
+            new TargetMethod("fhv", "j", "void", "aaru", "sgm", "java.lang.String"),
+            new TargetMethod("fde", "j", "void", "aajc", "rzc", "java.lang.String")
+        };
+        Method match = null;
+        for (TargetMethod target : targets) {
+            try {
+                Method method = target.resolve(loader);
+                if (java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                RamblerDictationFilter.field(method.getParameterTypes()[0], "b", java.util.List.class);
+                if (match != null) { Log.w(TAG, "Ambiguous dictation handler; filter skipped"); return; }
+                match = method;
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) { }
+        }
+        if (match == null) { Log.i(TAG, "Dictation transcript filter unavailable for this build"); return; }
+        try {
+            hook(match).intercept(chain -> {
+                if (FeatureConfig.rambler() && RamblerSelection.mayExpose(hostContext)
+                        && !chain.getArgs().isEmpty()) RamblerDictationFilter.filter(chain.getArgs().get(0));
+                return chain.proceed();
+            });
+            Log.i(TAG, "Installed COMPOSE-only dictation filter: " + match.getDeclaringClass().getName());
+        } catch (RuntimeException | LinkageError error) { Log.w(TAG, "Dictation filter hook skipped", error); }
     }
     private String gboardVersion(Context context) {
         try { return context.getPackageManager().getPackageInfo(GBOARD,0).versionName; }

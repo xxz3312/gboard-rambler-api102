@@ -11,6 +11,15 @@ import static org.junit.Assert.*;
 public final class SettingsActivityLaunchTest {
     @Test public void launchesWithoutFrameworkInLightTheme() { launch(false); }
     @Test public void launchesWithoutFrameworkInDarkTheme() { launch(true); }
+    private boolean containsUpdateRow(android.view.ViewGroup parent) {
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            android.view.View child = parent.getChildAt(i);
+            if (child instanceof android.widget.TextView
+                    && "检查更新".contentEquals(((android.widget.TextView) child).getText())) return true;
+            if (child instanceof android.view.ViewGroup && containsUpdateRow((android.view.ViewGroup) child)) return true;
+        }
+        return false;
+    }
     private void launch(boolean dark) {
         androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(dark
                 ? androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
@@ -19,6 +28,7 @@ public final class SettingsActivityLaunchTest {
             SettingsActivity activity=controller.setup().visible().get();
             assertNotNull(activity.findViewById(android.R.id.content));
             assertFalse(activity.isFinishing());
+            assertTrue(containsUpdateRow((android.view.ViewGroup) activity.findViewById(android.R.id.content)));
         } finally {
             androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
                     androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
