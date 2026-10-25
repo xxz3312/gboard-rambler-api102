@@ -109,7 +109,7 @@ public final class SettingsActivity extends AppCompatActivity {
         toggle(features, "scan_text", "扫描文本 / 相机 OCR", "启用 Gboard 工具栏中的扫描文本", R.drawable.ic_edit, false);
         divider(features);
         toggle(features, "screenshot_suggestions", "截图浮动建议", "在 Gboard 中显示最近截图与图片建议", R.drawable.ic_info, false);
-        MaterialTextView hint = label("更改功能后，请重新启动 Gboard。",
+        MaterialTextView hint = label("同步后运行时策略可更新；Gboard 已缓存的界面或模型需重启。",
                 com.google.android.material.R.style.TextAppearance_Material3_BodySmall,
                 com.google.android.material.R.attr.colorOnSurfaceVariant);
         hint.setPadding(dp(16), dp(8), dp(16), 0);
@@ -123,11 +123,25 @@ public final class SettingsActivity extends AppCompatActivity {
             firstUpstream = false;
             toggle(upstream, feature.key, feature.title, feature.summary, R.drawable.ic_edit, false);
         }
-        MaterialTextView upstreamHint = label("这些开关启用 Gboard 已有能力，实际入口与效果取决于当前版本和语言。修改后重启 Gboard。",
+        MaterialTextView upstreamHint = label("这些开关启用 Gboard 已有能力，实际入口与效果取决于当前版本和语言。同步后重新打开键盘；若界面未刷新，请重启 Gboard。",
                 com.google.android.material.R.style.TextAppearance_Material3_BodySmall,
                 com.google.android.material.R.attr.colorOnSurfaceVariant);
         upstreamHint.setPadding(dp(16), dp(8), dp(16), 0);
         list.addView(upstreamHint);
+
+        section(list, "剪贴板");
+        LinearLayout clipboard = group(list);
+        row(clipboard, "剪贴板保留时长", "模块选项优先；遵循 Gboard 可恢复原设置", R.drawable.ic_info, () -> {
+            android.content.SharedPreferences prefs = getSharedPreferences("features", MODE_PRIVATE);
+            int selected = ClipboardRetention.index(prefs.getString(ClipboardRetention.KEY, "stock"));
+            new MaterialAlertDialogBuilder(this).setTitle("剪贴板保留时长")
+                    .setSingleChoiceItems(ClipboardRetention.LABELS, selected, (dialog, which) -> {
+                        prefs.edit().putString(ClipboardRetention.KEY, ClipboardRetention.VALUES[which]).apply();
+                        ((ModuleApp) getApplication()).sync();
+                        dialog.dismiss();
+                        Snackbar.make(root, "已保存："+ClipboardRetention.LABELS[which]+"；实际清理需验证", Snackbar.LENGTH_LONG).show();
+                    }).setNegativeButton("关闭", null).show();
+        });
 
         section(list, "外观");
         LinearLayout appearance = group(list);
