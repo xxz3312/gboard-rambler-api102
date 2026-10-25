@@ -1,7 +1,8 @@
 -dontwarn io.github.libxposed.annotation.**
 -adaptresourcefilecontents META-INF/xposed/java_init.list
--keep,allowoptimization,allowobfuscation public class * extends io.github.libxposed.api.XposedModule {
-    public <init>();
-}
--keep class dev.kaede.pixelboard.RamblerBindings { *; }
--keep class dev.kaede.pixelboard.RamblerFlagBindings { *; }
+# Preserve the small hook/config surface; R8 still shrinks dependencies/resources.
+-keep class dev.kaede.pixelboard.** { *; }
+-keep class io.github.libxposed.service.** { *; }
+-repackageclasses dev.kaede.pixelboard.internal
+
+-keep class org.luckypray.dexkit.** { *; }

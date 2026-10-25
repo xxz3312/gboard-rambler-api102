@@ -17,3 +17,11 @@ included in the cloud-stable release.
   https://github.com/material-components/material-components-android
   https://android.googlesource.com/platform/frameworks/support/
   Resolved dependency POMs accompany the release notices archive.
+
+- DexKit 2.3.0: Android layer Apache-2.0, native core LGPL-3.0.
+  https://github.com/LuckyPray/DexKit/tree/2.3.0
+  Full license texts and upstream notice: assets/licenses/dexkit-*.txt.
+  Native core is bundled without project modifications. To replace/relink it,
+  build the matching upstream core or supply a compatible replacement shared
+  library, replace lib/<ABI>/libdexkit.so, rebuild and sign the module APK.
+  Module build scripts and source are provided with the release tag.

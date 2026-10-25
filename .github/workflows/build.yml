@@ -2,7 +2,7 @@ name: Android CI
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, writing-tools-upstream-port, port-ocr-screenshot-belka]
 jobs:
   debug:
     runs-on: ubuntu-latest
@@ -22,9 +22,10 @@ jobs:
           else
             echo "sdkmanager missing"; exit 1
           fi
-      - run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace --no-daemon
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: gboard-rambler-debug
+          name: gboard-rambler-debug-${{ github.ref_name }}
           path: app/build/outputs/apk/debug/*.apk
+

@@ -21,6 +21,11 @@ public final class RamblerBindings {
             read = new TargetMethod(readOwner, "a", "boolean", "android.content.Context");
             defaults = new TargetMethod(defaultOwner, defaultName, "void");
         }
+        Profile(String id, TargetMethod[] methods) {
+            if(methods.length!=6) throw new IllegalArgumentException("Expected six selector methods");
+            this.id=id; layout=methods[0]; setup=methods[1]; create=methods[2];
+            write=methods[3]; read=methods[4]; defaults=methods[5];
+        }
         public TargetMethod[] all() { return new TargetMethod[]{layout,setup,create,write,read,defaults}; }
     }
     public static final Profile[] PROFILES = {

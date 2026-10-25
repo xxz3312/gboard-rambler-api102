@@ -11,14 +11,15 @@ import java.lang.reflect.Method;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam;
 
-/** Gboard-only modern LSPosed entry; fail-closed reflection and disabled feature switches. */
+/** Modern LSPosed entry scoped to Gboard; local-model experiments are inactive. */
 public final class PixelBoardModule extends XposedModule {
     private static final String TAG = "PixelBoardLS";
     private static final String GBOARD = "com.google.android.inputmethod.latin";
 
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
-    private final AtomicInteger writingFlagLogCount = new AtomicInteger(0);
+    private final java.util.Set<String> writingFlagsLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
+    private volatile boolean verifiedWritingTools184;
     private volatile Context hostContext;
 
     @Override public void onModuleLoaded(io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam param) {
@@ -33,111 +34,155 @@ public final class PixelBoardModule extends XposedModule {
         try {
             Method attach = Application.class.getDeclaredMethod("attach", Context.class);
             hook(attach).intercept(chain -> {
-                Object result = chain.proceed();
                 Object arg = chain.getArgs().isEmpty() ? null : chain.getArgs().get(0);
                 if (arg instanceof Context && bootstrapped.compareAndSet(false, true)) {
                     Context appContext = (Context) arg;
                     if (GBOARD.equals(appContext.getPackageName())) {
                         try { initializeForGboard(loader, appContext); }
-                        catch (Throwable ex) { Log.e(TAG, "Gboard post-attach initialization failed", ex); }
+                        catch (Throwable ex) {
+                            CloudRuntimeStatus.send(appContext,"ERROR","initialization="+ex.getClass().getSimpleName());
+                            Log.e(TAG, "Gboard pre-attach initialization failed", ex);
+                        }
                     } else {
                         bootstrapped.set(false);
                     }
                 }
-                return result;
+                // Application.attach invokes host attachBaseContext; install before it reads/caches flags.
+                return chain.proceed();
             });
-            Log.i(TAG, "Application.attach hook installed");
+            Log.i(TAG, "Application.attach hook installed (before host attachBaseContext)");
         } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
             Log.e(TAG, "Application.attach hook installation failed", ex);
         }
     }
+
+
 
     private void initializeForGboard(ClassLoader loader, Context context) {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
         FeatureConfig.initialize(this);
         try {
             PackageInfo pkg = context.getPackageManager().getPackageInfo(GBOARD, 0);
+            verifiedWritingTools184 = pkg.getLongVersionCode() == 176027078L
+                    && "18.4.1.985164140-release-arm64-v8a".equals(pkg.versionName);
             Log.i(TAG, "Target Gboard version=" + pkg.versionName
                     + ", versionCode=" + pkg.getLongVersionCode());
         } catch (android.content.pm.PackageManager.NameNotFoundException e) {
             Log.w(TAG, "Gboard package version unavailable", e);
         }
-        Log.i(TAG, "Gboard Application Context available; SDK " + Build.VERSION.SDK_INT
-              + "; Rambler=" + FeatureConfig.rambler()
-              + "; diagnostics=" + FeatureConfig.diagnostics());
-        if (FeatureConfig.spellchecker()) installSpellChecker(loader);
-        if (FeatureConfig.writingTools()) WritingToolsDiagnostics.probe(loader);
-        RamblerBindings.Profile voiceProfile = null;
-        if (FeatureConfig.rambler() || FeatureConfig.diagnostics()) {
-            voiceProfile = RamblerBindings.select(loader);
-            if (voiceProfile != null) installRambler(loader, voiceProfile);
-            else Log.w(TAG, "No unique verified Rambler selector signatures; voice hooks skipped");
+        GboardResolver.Result resolved=GboardResolver.resolve(hostContext,loader);
+        boolean voiceCompatible=resolved.flags!=null && resolved.voice!=null;
+        boolean writingCompatible=resolved.flags!=null && resolved.writing;
+        FeatureConfig.compatibility(voiceCompatible,writingCompatible);
+        CloudRuntimeStatus.send(hostContext,"COMPAT","rambler="+voiceCompatible
+                +" writing="+writingCompatible+" resolver="+resolved.source);
+        CloudRuntimeStatus.send(hostContext,"INIT","rambler="+FeatureConfig.rambler()
+                +" writingTools="+FeatureConfig.writingTools()+" version="+gboardVersion(context));
+        Log.i(TAG,"Compatibility rambler="+voiceCompatible+" writing="+writingCompatible
+                +" resolver="+resolved.source);
+        boolean voiceInstalled=!FeatureConfig.rambler() || installRambler(loader,resolved.voice);
+        boolean getterInstalled=false;
+        if ((FeatureConfig.rambler() || FeatureConfig.writingTools() || FeatureConfig.extrasRequested()) && resolved.flags!=null)
+            getterInstalled=installFlagGetter(resolved.flags);
+        CloudRuntimeStatus.send(hostContext,"HOOKS",
+                "ramblerRequested="+FeatureConfig.ramblerRequested()
+                +" writingRequested="+FeatureConfig.writingRequested()
+                +" ramblerInstalled="+(FeatureConfig.rambler() && voiceInstalled && getterInstalled)
+                +" writingInstalled="+(FeatureConfig.writingTools() && getterInstalled)
+                +" getterInstalled="+getterInstalled
+                +" extrasRequested="+FeatureConfig.extrasRequested()
+                +" extrasInstalled="+(FeatureConfig.extrasRequested() && getterInstalled));
+        boolean roundedPreference = !FeatureConfig.roundedKeys() || getterInstalled && installRoundedPreference(loader);
+        CloudRuntimeStatus.send(hostContext,"EXTRAS",
+                "scanText="+FeatureConfig.scanText()+" screenshot="+FeatureConfig.screenshot()
+                +" roundedKeys="+FeatureConfig.roundedKeys()+" getter="+getterInstalled
+                +" roundedPreference="+roundedPreference+"; "+HostFeaturePermissions.summary(hostContext));
+        FeatureConfig.compatibility(
+                voiceCompatible && (!FeatureConfig.ramblerRequested() || voiceInstalled && getterInstalled),
+                writingCompatible && (!FeatureConfig.writingRequested() || getterInstalled));
+        if (FeatureConfig.writingTools()) {
+            WritingToolsDiagnostics.probe(loader);
+            if (FeatureConfig.diagnostics() && verifiedWritingTools184) observeWritingTools184State(loader);
+            Log.i(TAG,"Writing Tools basic cloud; V2=false; backend=GBOARD_SERVER; local=false");
         }
-        if (FeatureConfig.rambler() || FeatureConfig.writingTools()) {
-            RamblerFlagBindings.Binding flags = voiceProfile != null
-                    ? RamblerFlagBindings.resolve(loader, voiceProfile.id)
-                    : RamblerFlagBindings.resolveUnique(loader);
-            if (flags != null) installFlagGetter(flags);
-            else Log.w(TAG, "No unique typed flag getter; feature overrides skipped");
+    }
+    private boolean installRoundedPreference(ClassLoader loader) {
+        try {
+            Method getter = Class.forName("android.app.SharedPreferencesImpl", false, loader)
+                    .getDeclaredMethod("getBoolean", String.class, boolean.class);
+            hook(getter).intercept(chain -> {
+                if (FeatureConfig.roundedKeys() && "enable_rounded_keys".equals(chain.getArgs().get(0)))
+                    return Boolean.TRUE;
+                return chain.proceed();
+            });
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+            Log.w(TAG,"Rounded preference hook could not be installed",error);
+            return false;
         }
-        if (FeatureConfig.writingTools())
-            Log.i(TAG, "Writing Tools experimental override installed only if shared getter was resolved; toolbar is not guaranteed");
+    }
+    private String gboardVersion(Context context) {
+        try { return context.getPackageManager().getPackageInfo(GBOARD,0).versionName; }
+        catch (Exception e) { return "unknown"; }
     }
 
-    private void installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
+    private boolean installRambler(ClassLoader loader, RamblerBindings.Profile profile) {
         Log.i(TAG, "Resolved selector signature family: " + profile.id);
-        hookScope(profile.layout, loader, false);
-        hookScope(profile.setup, loader, false);
-        hookScope(profile.create, loader, false);
-        hookScope(profile.defaults, loader, true);
-        observeSelectionRead(profile.read, loader);
-        observeSelectionWrite(profile.write, loader);
+        boolean installed=true;
+        installed &= hookScope(profile.layout, loader, false);
+        installed &= hookScope(profile.setup, loader, false);
+        installed &= hookScope(profile.create, loader, false);
+        installed &= hookScope(profile.defaults, loader, true);
+        installed &= observeSelectionRead(profile.read, loader);
+        installed &= observeSelectionWrite(profile.write, loader);
+        return installed;
     }
 
-    private void hookScope(TargetMethod target, ClassLoader loader, boolean defaults) {
+    private boolean hookScope(TargetMethod target, ClassLoader loader, boolean defaults) {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 if (defaults) RamblerScope.enterDefault(); else RamblerScope.enterVoice();
                 try { return chain.proceed(); }
                 finally {
-                    if (defaults) RamblerScope.exitDefault();
-                    else RamblerScope.exitVoice();
+                    if (defaults) RamblerScope.exitDefault(); else RamblerScope.exitVoice();
                 }
             });
+            return true;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
             Log.w(TAG, "Scope hook skipped: " + target, e);
+            return false;
         }
     }
 
-    private void observeSelectionRead(TargetMethod target, ClassLoader loader) {
+    private boolean observeSelectionRead(TargetMethod target, ClassLoader loader) {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
-                if (result instanceof Boolean) {
-                    // Use host-owned Context rather than trusting a foreign caller.
-                    RamblerSelection.observe((Boolean) result, GboardContext.current());
-                }
+                if (result instanceof Boolean) RamblerSelection.observe((Boolean) result, hostContext);
                 return result;
             });
+            return true;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
             Log.w(TAG, "Selection read observer skipped: " + target, e);
+            return false;
         }
     }
 
-    private void observeSelectionWrite(TargetMethod target, ClassLoader loader) {
+    private boolean observeSelectionWrite(TargetMethod target, ClassLoader loader) {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
-                if (FeatureConfig.diagnostics())
-                    Log.d(TAG, "Official selector write completed (no forced selection)");
+                if (FeatureConfig.diagnostics()) Log.d(TAG, "Official selector write completed (no forced selection)");
                 return result;
             });
+            return true;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
             Log.w(TAG, "Selection write observer skipped: " + target, e);
+            return false;
         }
     }
 
-    private void installFlagGetter(RamblerFlagBindings.Binding binding) {
+    private boolean installFlagGetter(RamblerFlagBindings.Binding binding) {
         try {
             hook(binding.getter).intercept(chain -> {
                 Object original = chain.proceed();
@@ -145,7 +190,7 @@ public final class PixelBoardModule extends XposedModule {
                 if (receiver == null) return original;
                 try {
                     String flag = binding.name(receiver);
-                    if (!RamblerFlagPolicy.targeted(flag) && !WritingToolsFlagPolicy.targeted(flag)) return original;
+                    if (!RamblerFlagPolicy.targeted(flag) && !WritingToolsFlagPolicy.targeted(flag) && !KeyboardFeaturePolicy.targeted(flag)) return original;
                     Context context = hostContext;
                     if (context == null || !GBOARD.equals(context.getPackageName()))
                         return original;
@@ -158,33 +203,86 @@ public final class PixelBoardModule extends XposedModule {
                                     + " changed=" + !java.util.Objects.equals(original, writingResult));
                     }
                     if (FeatureConfig.writingTools() && WritingToolsFlagPolicy.targeted(flag)
-                            && writingFlagLogCount.incrementAndGet() <= 40) {
+                            && writingFlagsLogged.add(flag)) {
+                        CloudRuntimeStatus.send(hostContext, "FLAG", flag + " changed="
+                                + !java.util.Objects.equals(original, writingResult));
                         Log.i(TAG, "WritingTools flag observed: " + flag
                                 + " type=" + (original == null ? "null" : original.getClass().getSimpleName())
                                 + " changed=" + !java.util.Objects.equals(original, writingResult));
                     }
-                    return RamblerFlagPolicy.transform(flag, writingResult, context);
+                    Object result = KeyboardFeaturePolicy.transform(flag,
+                            RamblerFlagPolicy.transform(flag, writingResult, context));
+                    if (KeyboardFeaturePolicy.targeted(flag) && FeatureConfig.diagnostics()
+                            && writingFlagsLogged.add("extra:"+flag))
+                        CloudRuntimeStatus.send(context,"EXTRA_FLAG",flag+" changed="+!java.util.Objects.equals(original,result));
+                    return result;
                 } catch (ReflectiveOperationException | RuntimeException e) {
                     Log.w(TAG, "Flag transform failed; stock value returned", e);
                     return original;
                 }
             });
+            CloudRuntimeStatus.send(hostContext, "GETTER", "installed profile=" + binding.profile);
             Log.i(TAG, "Installed shared guarded Rambler/WritingTools flag policy: " + binding.owner
                     + " / profile=" + binding.profile);
+            return true;
         } catch (RuntimeException | LinkageError e) {
             Log.w(TAG, "Flag getter hook skipped", e);
+            return false;
         }
     }
 
-    private void installSpellChecker(ClassLoader loader) {
-        if (Build.VERSION.SDK_INT < 31) return;
+    /** Exact 18.4 mapping. Read signals after stock callbacks; never alter eligibility. */
+    private void observeWritingTools184State(ClassLoader loader) {
         try {
-            TargetMethod target = new TargetMethod("rcq", "m", "boolean",
-                    "android.content.Context", "android.view.textservice.TextServicesManager");
-            Method method = target.resolve(loader);
-            hook(method).intercept(chain -> true);
-        } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
-            Log.w(TAG, "Spellchecker hook skipped", e);
+            Method signalRead = new TargetMethod("qeq", "e", "boolean", "qem").resolve(loader);
+            Class<?> signals = Class.forName("qrr", false, loader);
+            java.lang.reflect.Field[] fields = new java.lang.reflect.Field[5];
+            String[] names = {"c", "d", "g", "h", "i"};
+            String[] labels = {"proofreadProvisioned", "proofreadReady", "handlerProvisioned",
+                    "handlerEverProvisioned", "handlerReady"};
+            Class<?> signalType = Class.forName("qem", false, loader);
+            for (int i = 0; i < fields.length; i++) {
+                fields[i] = signals.getDeclaredField(names[i]);
+                if (fields[i].getType() != signalType
+                        || !java.lang.reflect.Modifier.isStatic(fields[i].getModifiers()))
+                    throw new NoSuchFieldException("Unexpected signal type: " + names[i]);
+                fields[i].setAccessible(true);
+            }
+            Method backend = new TargetMethod("qyn", "a", "qym").resolve(loader);
+            Method updater = new TargetMethod("hpz", "fM", "void",
+                    "android.content.Context", "qad").resolve(loader);
+            Method menu = new TargetMethod("hmp", "d", "void").resolve(loader);
+            AtomicInteger hits = new AtomicInteger();
+            for (Method target : new Method[] {updater, menu}) {
+                hook(target).intercept(chain -> {
+                    Object result = chain.proceed();
+                    if (hits.incrementAndGet() <= 12) {
+                        try {
+                            StringBuilder line = new StringBuilder("WritingTools 18.4 state after ")
+                                    .append(target.getDeclaringClass().getSimpleName());
+                            for (int i = 0; i < fields.length; i++)
+                                line.append(" ").append(labels[i]).append("=")
+                                        .append(signalRead.invoke(null, fields[i].get(null)));
+                            // The menu already reads this backend. Avoid initializing it in onCreate.
+                            if (target == menu) {
+                                Object value = backend.invoke(null);
+                                line.append(" backend=").append(value instanceof Enum<?>
+                                        ? ((Enum<?>) value).name() : "<unknown>");
+                            }
+                            Log.i(TAG, line.toString());
+                        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+                            Log.w(TAG, "WritingTools state observation skipped", e);
+                        }
+                    }
+                    return result;
+                });
+            }
+            Log.i(TAG, "WritingTools 18.4 state observers installed; no signal overrides");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            Log.w(TAG, "WritingTools 18.4 state observers not installed", e);
         }
     }
+
 }
+
+
