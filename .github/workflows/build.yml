@@ -2,7 +2,7 @@ name: Android CI
 on:
   workflow_dispatch:
   push:
-    branches: [main, writing-tools-upstream-port]
+    branches: [main, writing-tools-upstream-port, port-ocr-screenshot-belka]
 jobs:
   debug:
     runs-on: ubuntu-latest
@@ -28,3 +28,4 @@ jobs:
         with:
           name: gboard-rambler-debug-${{ github.ref_name }}
           path: app/build/outputs/apk/debug/*.apk
+

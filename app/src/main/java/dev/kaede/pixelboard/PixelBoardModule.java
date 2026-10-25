@@ -82,14 +82,21 @@ public final class PixelBoardModule extends XposedModule {
                 +" resolver="+resolved.source);
         boolean voiceInstalled=!FeatureConfig.rambler() || installRambler(loader,resolved.voice);
         boolean getterInstalled=false;
-        if ((FeatureConfig.rambler() || FeatureConfig.writingTools()) && resolved.flags!=null)
+        if ((FeatureConfig.rambler() || FeatureConfig.writingTools() || FeatureConfig.extrasRequested()) && resolved.flags!=null)
             getterInstalled=installFlagGetter(resolved.flags);
         CloudRuntimeStatus.send(hostContext,"HOOKS",
                 "ramblerRequested="+FeatureConfig.ramblerRequested()
                 +" writingRequested="+FeatureConfig.writingRequested()
                 +" ramblerInstalled="+(FeatureConfig.rambler() && voiceInstalled && getterInstalled)
                 +" writingInstalled="+(FeatureConfig.writingTools() && getterInstalled)
-                +" getterInstalled="+getterInstalled);
+                +" getterInstalled="+getterInstalled
+                +" extrasRequested="+FeatureConfig.extrasRequested()
+                +" extrasInstalled="+(FeatureConfig.extrasRequested() && getterInstalled));
+        if (FeatureConfig.roundedKeys() && getterInstalled) installRoundedPreference(loader);
+        CloudRuntimeStatus.send(hostContext,"EXTRAS",
+                "scanText="+FeatureConfig.scanText()+" screenshot="+FeatureConfig.screenshot()
+                +" roundedKeys="+FeatureConfig.roundedKeys()+" getter="+getterInstalled
+                +"; "+HostFeaturePermissions.summary(hostContext));
         FeatureConfig.compatibility(
                 voiceCompatible && (!FeatureConfig.ramblerRequested() || voiceInstalled && getterInstalled),
                 writingCompatible && (!FeatureConfig.writingRequested() || getterInstalled));
@@ -97,6 +104,20 @@ public final class PixelBoardModule extends XposedModule {
             WritingToolsDiagnostics.probe(loader);
             if (FeatureConfig.diagnostics() && verifiedWritingTools184) observeWritingTools184State(loader);
             Log.i(TAG,"Writing Tools basic cloud; V2=false; backend=GBOARD_SERVER; local=false");
+        }
+    }
+    private void installRoundedPreference(ClassLoader loader) {
+        try {
+            Method getter = Class.forName("android.app.SharedPreferencesImpl", false, loader)
+                    .getDeclaredMethod("getBoolean", String.class, boolean.class);
+            hook(getter).intercept(chain -> {
+                if (FeatureConfig.roundedKeys() && "enable_rounded_keys".equals(chain.getArgs().get(0)))
+                    return Boolean.TRUE;
+                return chain.proceed();
+            });
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+            CloudRuntimeStatus.send(hostContext,"EXTRAS","rounded preference hook failed="+error.getClass().getSimpleName());
+            Log.w(TAG,"Rounded preference hook failed",error);
         }
     }
     private String gboardVersion(Context context) {
@@ -168,7 +189,7 @@ public final class PixelBoardModule extends XposedModule {
                 if (receiver == null) return original;
                 try {
                     String flag = binding.name(receiver);
-                    if (!RamblerFlagPolicy.targeted(flag) && !WritingToolsFlagPolicy.targeted(flag)) return original;
+                    if (!RamblerFlagPolicy.targeted(flag) && !WritingToolsFlagPolicy.targeted(flag) && !KeyboardFeaturePolicy.targeted(flag)) return original;
                     Context context = hostContext;
                     if (context == null || !GBOARD.equals(context.getPackageName()))
                         return original;
@@ -188,7 +209,12 @@ public final class PixelBoardModule extends XposedModule {
                                 + " type=" + (original == null ? "null" : original.getClass().getSimpleName())
                                 + " changed=" + !java.util.Objects.equals(original, writingResult));
                     }
-                    return RamblerFlagPolicy.transform(flag, writingResult, context);
+                    Object result = KeyboardFeaturePolicy.transform(flag,
+                            RamblerFlagPolicy.transform(flag, writingResult, context));
+                    if (KeyboardFeaturePolicy.targeted(flag) && FeatureConfig.diagnostics()
+                            && writingFlagsLogged.add("extra:"+flag))
+                        CloudRuntimeStatus.send(context,"EXTRA_FLAG",flag+" changed="+!java.util.Objects.equals(original,result));
+                    return result;
                 } catch (ReflectiveOperationException | RuntimeException e) {
                     Log.w(TAG, "Flag transform failed; stock value returned", e);
                     return original;
@@ -257,4 +283,5 @@ public final class PixelBoardModule extends XposedModule {
     }
 
 }
+
 

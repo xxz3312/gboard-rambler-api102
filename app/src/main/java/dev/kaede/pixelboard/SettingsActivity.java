@@ -105,6 +105,10 @@ public final class SettingsActivity extends AppCompatActivity {
         toggle(features, "rambler", "Rambler", "语音输入与智能编辑", R.drawable.ic_mic, false);
         divider(features);
         toggle(features, "writing_tools", "AI 写作工具", "联网校对与改写", R.drawable.ic_edit, false);
+        divider(features);
+        toggle(features, "scan_text", "扫描文本 / 相机 OCR", "启用 Gboard 工具栏中的扫描文本", R.drawable.ic_edit, false);
+        divider(features);
+        toggle(features, "screenshot_suggestions", "截图浮动建议", "在 Gboard 中显示最近截图与图片建议", R.drawable.ic_info, false);
         MaterialTextView hint = label("更改功能后，请重新启动 Gboard。",
                 com.google.android.material.R.style.TextAppearance_Material3_BodySmall,
                 com.google.android.material.R.attr.colorOnSurfaceVariant);
@@ -113,6 +117,8 @@ public final class SettingsActivity extends AppCompatActivity {
 
         section(list, "外观");
         LinearLayout appearance = group(list);
+        toggle(appearance, "rounded_keys", "Material 3 表现力圆角键", "启用 Belka UI 胶囊形按键", R.drawable.ic_edit, false);
+        divider(appearance);
         launcherSwitch = toggle(appearance, null, "隐藏桌面图标", "隐藏后可从 LSPosed 打开设置",
                 R.drawable.ic_visibility_off, isLauncherHidden());
         launcherSwitch.setOnCheckedChangeListener((button, hidden) -> {
@@ -129,6 +135,16 @@ public final class SettingsActivity extends AppCompatActivity {
 
         section(list, "运行与诊断");
         LinearLayout status = group(list);
+        row(status, "相机与图片权限", "查看 Gboard 权限及使用条件", R.drawable.ic_info, () ->
+                new MaterialAlertDialogBuilder(this).setTitle("Gboard 相机与图片权限")
+                        .setMessage(HostFeaturePermissions.summary(this)+"\n\n请在 Gboard 的权限页面授权。OCR 从工具栏的扫描文本进入；截图建议还需在 Gboard 剪贴板设置中启用。\n\n若官方安装包未声明相应权限，LSPosed 功能开关无法添加权限，此安装包可能无法使用对应功能。组件缺失或版本差异也可能影响入口。")
+                        .setNegativeButton("关闭", null)
+                        .setPositiveButton("Gboard 设置", (dialog, which) -> {
+                            try { startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.parse("package:com.google.android.inputmethod.latin"))); }
+                            catch (RuntimeException error) { Toast.makeText(this,"无法打开应用设置",Toast.LENGTH_SHORT).show(); }
+                        }).show());
+        divider(status);
         Row framework = row(status, "框架服务", "", R.drawable.ic_link, null);
         frameworkSummary = framework.summary;
         divider(status);
@@ -364,3 +380,4 @@ public final class SettingsActivity extends AppCompatActivity {
         refreshLauncher();
     }
 }
+

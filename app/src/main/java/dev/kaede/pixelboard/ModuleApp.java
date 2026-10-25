@@ -31,6 +31,9 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
         SharedPreferences local = getSharedPreferences("features", MODE_PRIVATE);
         return "保存配置：Rambler=" + local.getBoolean("rambler", false)
                 + " 写作工具=" + local.getBoolean("writing_tools", false)
+                + " 扫描文本=" + local.getBoolean("scan_text", false)
+                + " 截图建议=" + local.getBoolean("screenshot_suggestions", false)
+                + " 圆角键=" + local.getBoolean("rounded_keys", false)
                 + "\n服务连接：" + connected() + "\n" + lastSync;
     }
 
@@ -45,6 +48,9 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
                     .remove("spellchecker")
                     .putBoolean("diagnostics", local.getBoolean("diagnostics", false))
                     .putBoolean("writing_tools", local.getBoolean("writing_tools", false))
+                    .putBoolean("scan_text", local.getBoolean("scan_text", false))
+                    .putBoolean("screenshot_suggestions", local.getBoolean("screenshot_suggestions", false))
+                    .putBoolean("rounded_keys", local.getBoolean("rounded_keys", false))
                     .commit();
             lastSync = success ? "最近一次同步成功（不代表 Hook 已加载）。" : "配置同步失败。";
             Log.i(TAG, "Remote preferences sync=" + success);
@@ -54,4 +60,5 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
         }
     }
 }
+
 

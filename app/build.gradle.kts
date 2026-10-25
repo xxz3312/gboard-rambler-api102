@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 32
-        versionName = "0.1.30"
+        versionCode = 34
+        versionName = "0.1.32"
     }
     buildTypes {
         release {
@@ -21,4 +21,5 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
 dependencies { compileOnly("io.github.libxposed:api:102.0.0"); implementation("io.github.libxposed:service:102.0.0"); implementation("com.google.android.material:material:1.13.0"); implementation("org.luckypray:dexkit:2.3.0"); testImplementation("junit:junit:4.13.2"); testImplementation("org.robolectric:robolectric:4.14.1") }
+
 
