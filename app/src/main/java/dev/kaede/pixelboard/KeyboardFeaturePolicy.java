@@ -21,7 +21,7 @@ public final class KeyboardFeaturePolicy {
     }
     public static boolean targeted(String name) {
         return name != null && (OCR.contains(name) || SCREENSHOT.contains(name)
-                || ROUNDED.contains(name) || "enabled_ocr_language_tags".equals(name));
+                || ROUNDED.contains(name) || UpstreamFeature.targeted(name) || "enabled_ocr_language_tags".equals(name));
     }
     static Object overrideValue(String name, Object original, boolean ocr, boolean screenshot, boolean rounded) {
         if (name == null) return original;
@@ -32,7 +32,7 @@ public final class KeyboardFeaturePolicy {
         return original;
     }
     public static Object transform(String name, Object original) {
-        return overrideValue(name, original, FeatureConfig.scanText(),
-                FeatureConfig.screenshot(), FeatureConfig.roundedKeys());
+        return UpstreamFeature.transform(name, overrideValue(name, original, FeatureConfig.scanText(),
+                FeatureConfig.screenshot(), FeatureConfig.roundedKeys()));
     }
 }

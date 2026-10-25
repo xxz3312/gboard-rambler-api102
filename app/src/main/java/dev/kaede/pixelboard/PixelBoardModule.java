@@ -97,6 +97,8 @@ public final class PixelBoardModule extends XposedModule {
                 "scanText="+FeatureConfig.scanText()+" screenshot="+FeatureConfig.screenshot()
                 +" roundedKeys="+FeatureConfig.roundedKeys()+" getter="+getterInstalled
                 +" roundedPreference="+roundedPreference+"; "+HostFeaturePermissions.summary(hostContext));
+        CloudRuntimeStatus.send(hostContext,"UPSTREAM",
+                "requested="+FeatureConfig.upstreamSummary()+" getter="+getterInstalled);
         FeatureConfig.compatibility(
                 voiceCompatible && (!FeatureConfig.ramblerRequested() || voiceInstalled && getterInstalled),
                 writingCompatible && (!FeatureConfig.writingRequested() || getterInstalled));

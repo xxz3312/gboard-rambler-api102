@@ -115,6 +115,20 @@ public final class SettingsActivity extends AppCompatActivity {
         hint.setPadding(dp(16), dp(8), dp(16), 0);
         list.addView(hint);
 
+        section(list, "输入与表情（实验性）");
+        LinearLayout upstream = group(list);
+        boolean firstUpstream = true;
+        for (UpstreamFeature feature : UpstreamFeature.values()) {
+            if (!firstUpstream) divider(upstream);
+            firstUpstream = false;
+            toggle(upstream, feature.key, feature.title, feature.summary, R.drawable.ic_edit, false);
+        }
+        MaterialTextView upstreamHint = label("这些开关启用 Gboard 已有能力，实际入口与效果取决于当前版本和语言。修改后重启 Gboard。",
+                com.google.android.material.R.style.TextAppearance_Material3_BodySmall,
+                com.google.android.material.R.attr.colorOnSurfaceVariant);
+        upstreamHint.setPadding(dp(16), dp(8), dp(16), 0);
+        list.addView(upstreamHint);
+
         section(list, "外观");
         LinearLayout appearance = group(list);
         toggle(appearance, "rounded_keys", "Material 3 表现力圆角键", "启用 Belka UI 胶囊形按键", R.drawable.ic_edit, false);
