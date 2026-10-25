@@ -66,9 +66,11 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
             boolean success = editor.commit();
             lastSync = success ? "最近一次同步成功（不代表 Hook 已加载）。" : "配置同步失败。";
             Log.i(TAG, "Remote preferences sync=" + success);
+            DiagnosticLog.record(this,"SYNC",lastSync);
         } catch (RuntimeException e) {
             lastSync = "配置同步异常：" + e.getClass().getSimpleName();
             Log.e(TAG, "Remote preferences sync failed", e);
+            DiagnosticLog.record(this,"SYNC_ERROR",Log.getStackTraceString(e));
         }
     }
 }

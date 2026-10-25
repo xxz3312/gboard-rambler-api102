@@ -42,7 +42,13 @@ public final class SettingsActivity extends AppCompatActivity {
     private boolean refreshingLauncher;
     private LinearLayout root;
     private MaterialTextView frameworkSummary, compatibilityTitle, compatibilitySummary;
-    private View restartAction;
+    private View restartAction, exportAction, updateAction;
+    private boolean exportRootLogs, exportPending, exportRunning, updateRunning;
+    private final androidx.activity.result.ActivityResultLauncher<String> createLogDocument =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"), uri -> {
+                exportPending = false;
+                if (uri != null) saveDiagnosticLog(uri); else if (exportAction != null) exportAction.setEnabled(true);
+            });
     private TextView detailText;
     private final android.os.Handler statusHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable statusTicker = new Runnable() {
@@ -69,6 +75,10 @@ public final class SettingsActivity extends AppCompatActivity {
         super.onCreate(state);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         prefs = getSharedPreferences("features", MODE_PRIVATE);
+        if (state != null) {
+            exportRootLogs = state.getBoolean("export_root", false);
+            exportPending = state.getBoolean("export_pending", false);
+        }
         root = column();
         int surface = color(com.google.android.material.R.attr.colorSurface);
         root.setBackgroundColor(surface);
@@ -193,8 +203,18 @@ public final class SettingsActivity extends AppCompatActivity {
         divider(status);
         toggle(status, "diagnostics", "诊断日志", "记录适配与 Hook 状态", R.drawable.ic_diagnostics, false);
 
+        divider(status);
+        exportAction = row(status, "导出日志", "保存为 TXT，可选包含 Root 日志", R.drawable.ic_diagnostics,
+                this::chooseLogExport).view;
+        exportAction.setId(R.id.export_logs);
+        exportAction.setEnabled(!exportPending);
+
         section(list, "关于");
         LinearLayout about = group(list);
+        updateAction = row(about, "检查更新", "检查 GitHub 最新正式版本", R.drawable.ic_sync,
+                this::checkForUpdates).view;
+        updateAction.setId(R.id.check_updates);
+        divider(about);
         row(about, "使用说明", "网络、语言与使用范围", R.drawable.ic_help, () ->
                 new MaterialAlertDialogBuilder(this).setTitle("使用说明")
                         .setMessage("AI 写作工具需要联网，并完成 Gboard 的同意流程。建议先在普通便签中用英语测试；部分应用可能被 Gboard 排除。\n\n开关开启、配置同步或适配成功不代表云端请求成功。修改功能后，请强制停止并重新唤起 Gboard。")
@@ -212,6 +232,91 @@ public final class SettingsActivity extends AppCompatActivity {
         systemBars.setAppearanceLightNavigationBars(light);
         ViewCompat.requestApplyInsets(root);
         refreshStatus();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state) {
+        state.putBoolean("export_root", exportRootLogs);
+        state.putBoolean("export_pending", exportPending);
+        super.onSaveInstanceState(state);
+    }
+    private void chooseLogExport() {
+        if (exportPending || exportRunning) return;
+        new MaterialAlertDialogBuilder(this).setTitle("导出日志")
+                .setItems(new String[]{"诊断日志（无需 Root）", "包含 Gboard 模块日志（需要 Root）"}, (dialog, which) -> {
+                    exportRootLogs = which == 1;
+                    exportPending = true;
+                    exportAction.setEnabled(false);
+                    String name="Gboard-Rambler-"+CloudRuntimeStatus.VERSION+"-"
+                            +new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.US).format(new java.util.Date())+".txt";
+                    try { createLogDocument.launch(name); }
+                    catch (RuntimeException error) {
+                        exportPending = false; exportAction.setEnabled(true);
+                        Toast.makeText(this,"无法打开文件保存界面",Toast.LENGTH_LONG).show();
+                    }
+                }).setNegativeButton("取消", null).show();
+    }
+    private void saveDiagnosticLog(android.net.Uri uri) {
+        exportRunning = true;
+        if (exportAction != null) exportAction.setEnabled(false);
+        android.content.Context app = getApplicationContext();
+        boolean rootLogs = exportRootLogs;
+        new Thread(() -> {
+            String message;
+            try {
+                String report = DiagnosticReport.build(app, rootLogs);
+                try (java.io.OutputStream stream = app.getContentResolver().openOutputStream(uri,"wt")) {
+                    if (stream == null) throw new java.io.IOException("无法打开目标文件");
+                    stream.write(report.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                }
+                message="日志已保存";
+            } catch (Exception error) {
+                DiagnosticLog.record(app,"EXPORT_ERROR",android.util.Log.getStackTraceString(error));
+                message="日志保存失败："+error.getClass().getSimpleName();
+            }
+            String result=message;
+            runOnUiThread(() -> {
+                exportRunning = false;
+                if (isDestroyed() || isFinishing()) return;
+                exportAction.setEnabled(true);
+                Toast.makeText(this,result,Toast.LENGTH_LONG).show();
+            });
+        },"diagnostic-export").start();
+    }
+    private void checkForUpdates() {
+        if (updateRunning) return;
+        updateRunning = true; updateAction.setEnabled(false);
+        Snackbar.make(root,"正在检查更新…",Snackbar.LENGTH_SHORT).show();
+        new Thread(() -> {
+            UpdateChecker.Result release=null; String failure=null;
+            try { release=UpdateChecker.check(CloudRuntimeStatus.VERSION); }
+            catch (Exception error) {
+                failure=error instanceof java.io.IOException ? error.getMessage() : "无法解析版本信息";
+                if (failure == null || failure.isEmpty()) failure="网络连接失败，请稍后重试";
+            }
+            UpdateChecker.Result result=release; String message=failure;
+            runOnUiThread(() -> {
+                updateRunning = false;
+                if (isDestroyed() || isFinishing()) return;
+                updateAction.setEnabled(true);
+                if (result == null) {
+                    new MaterialAlertDialogBuilder(this).setTitle("检查更新失败").setMessage(message)
+                            .setNegativeButton("关闭", null).setPositiveButton("打开发布页", (dialog, which) -> openReleasePage(UpdateChecker.RELEASES)).show();
+                    return;
+                }
+                String title=result.status==UpdateChecker.Status.NEWER ? "发现新版本 "+result.version
+                        : result.status==UpdateChecker.Status.AHEAD ? "当前版本高于最新正式版" : "已是最新正式版";
+                String detail="当前版本："+CloudRuntimeStatus.VERSION+"\n最新正式版："+result.version
+                        +(result.notes.isEmpty()?"":"\n\n"+result.notes);
+                new MaterialAlertDialogBuilder(this).setTitle(title).setMessage(detail)
+                        .setNegativeButton("关闭", null)
+                        .setPositiveButton(result.status==UpdateChecker.Status.NEWER?"前往下载":"查看发布页",
+                                (dialog, which) -> openReleasePage(result.url)).show();
+            });
+        },"release-check").start();
+    }
+    private void openReleasePage(String url) {
+        try { startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))); }
+        catch (RuntimeException error) { Toast.makeText(this,"无法打开发布页",Toast.LENGTH_LONG).show(); }
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }

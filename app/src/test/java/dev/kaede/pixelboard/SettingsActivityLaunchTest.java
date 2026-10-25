@@ -11,6 +11,21 @@ import static org.junit.Assert.*;
 public final class SettingsActivityLaunchTest {
     @Test public void launchesWithoutFrameworkInLightTheme() { launch(false); }
     @Test public void launchesWithoutFrameworkInDarkTheme() { launch(true); }
+    @Test public void exportOffersNonRootSaveThroughSystemPicker() {
+        try(ActivityController<SettingsActivity> controller=Robolectric.buildActivity(SettingsActivity.class)) {
+            SettingsActivity activity=controller.setup().visible().get();
+            assertNotNull(activity.findViewById(R.id.check_updates));
+            activity.findViewById(R.id.export_logs).performClick();
+            android.app.Dialog dialog=org.robolectric.shadows.ShadowDialog.getLatestDialog();
+            assertTrue(dialog instanceof androidx.appcompat.app.AlertDialog);
+            android.widget.ListView list=((androidx.appcompat.app.AlertDialog)dialog).getListView();
+            list.performItemClick(list.getChildAt(0),0,list.getAdapter().getItemId(0));
+            android.content.Intent intent=org.robolectric.Shadows.shadowOf(activity).getNextStartedActivityForResult().intent;
+            assertEquals(android.content.Intent.ACTION_CREATE_DOCUMENT,intent.getAction());
+            assertEquals("text/plain",intent.getType());
+            assertTrue(intent.getStringExtra(android.content.Intent.EXTRA_TITLE).endsWith(".txt"));
+        }
+    }
     @Test public void upstreamSwitchesPersistIndependentlyAcrossRelaunch() {
         android.content.Context context = org.robolectric.RuntimeEnvironment.getApplication();
         android.content.SharedPreferences prefs = context.getSharedPreferences("features", 0);

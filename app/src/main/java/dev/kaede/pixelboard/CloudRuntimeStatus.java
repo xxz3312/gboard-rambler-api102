@@ -7,7 +7,7 @@ import android.os.Process;
 
 /** Metadata only. Receiving app authenticates the sender through Android 14+ identity. */
 public final class CloudRuntimeStatus extends BroadcastReceiver {
-    public static final String VERSION="0.1.34";
+    public static final String VERSION="0.1.35";
     private static final String PREF="cloud_runtime_status";
     public static void send(Context context,String event,String detail) {
         if(context==null||Build.VERSION.SDK_INT<34)return;
@@ -40,6 +40,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
                 if(!"ERROR".equals(event))return;
                 edit.clear();
             }
+            DiagnosticLog.record(context,event,"version="+VERSION+" pid="+pid+" "+detail);
             edit.putInt("pid",pid).putString("version",VERSION)
                     .putString(event,detail).putLong(event+"_when",intent.getLongExtra("when",0)).apply();
         } catch(Exception ignored) {}

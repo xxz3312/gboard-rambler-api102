@@ -1,0 +1,4 @@
+<resources>
+    <item name="export_logs" type="id"/>
+    <item name="check_updates" type="id"/>
+</resources>
