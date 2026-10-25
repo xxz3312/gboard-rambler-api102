@@ -92,11 +92,11 @@ public final class PixelBoardModule extends XposedModule {
                 +" getterInstalled="+getterInstalled
                 +" extrasRequested="+FeatureConfig.extrasRequested()
                 +" extrasInstalled="+(FeatureConfig.extrasRequested() && getterInstalled));
-        if (FeatureConfig.roundedKeys() && getterInstalled) installRoundedPreference(loader);
+        boolean roundedPreference = !FeatureConfig.roundedKeys() || getterInstalled && installRoundedPreference(loader);
         CloudRuntimeStatus.send(hostContext,"EXTRAS",
                 "scanText="+FeatureConfig.scanText()+" screenshot="+FeatureConfig.screenshot()
                 +" roundedKeys="+FeatureConfig.roundedKeys()+" getter="+getterInstalled
-                +"; "+HostFeaturePermissions.summary(hostContext));
+                +" roundedPreference="+roundedPreference+"; "+HostFeaturePermissions.summary(hostContext));
         FeatureConfig.compatibility(
                 voiceCompatible && (!FeatureConfig.ramblerRequested() || voiceInstalled && getterInstalled),
                 writingCompatible && (!FeatureConfig.writingRequested() || getterInstalled));
@@ -106,7 +106,7 @@ public final class PixelBoardModule extends XposedModule {
             Log.i(TAG,"Writing Tools basic cloud; V2=false; backend=GBOARD_SERVER; local=false");
         }
     }
-    private void installRoundedPreference(ClassLoader loader) {
+    private boolean installRoundedPreference(ClassLoader loader) {
         try {
             Method getter = Class.forName("android.app.SharedPreferencesImpl", false, loader)
                     .getDeclaredMethod("getBoolean", String.class, boolean.class);
@@ -115,9 +115,10 @@ public final class PixelBoardModule extends XposedModule {
                     return Boolean.TRUE;
                 return chain.proceed();
             });
+            return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
-            CloudRuntimeStatus.send(hostContext,"EXTRAS","rounded preference hook failed="+error.getClass().getSimpleName());
-            Log.w(TAG,"Rounded preference hook failed",error);
+            Log.w(TAG,"Rounded preference hook could not be installed",error);
+            return false;
         }
     }
     private String gboardVersion(Context context) {
