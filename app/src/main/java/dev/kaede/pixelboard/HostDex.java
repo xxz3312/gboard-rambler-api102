@@ -2,6 +2,8 @@ package dev.kaede.pixelboard;
 
 import android.content.Context;
 import java.util.*;
+import java.io.IOException;
+import java.util.zip.ZipFile;
 import org.luckypray.dexkit.DexKitBridge;
 import org.luckypray.dexkit.query.FindMethod;
 import org.luckypray.dexkit.result.MethodData;
@@ -16,8 +18,15 @@ final class HostDex implements AutoCloseable {
         String[] splits = context.getApplicationInfo().splitSourceDirs;
         if (splits != null) paths.addAll(Arrays.asList(splits));
         try {
-            for (String path : new LinkedHashSet<>(paths)) bridges.add(DexKitBridge.create(path));
+            for (String path : new LinkedHashSet<>(paths))
+                if (containsDex(path)) bridges.add(DexKitBridge.create(path));
         } catch (RuntimeException | LinkageError error) { close(); throw error; }
+    }
+    static boolean containsDex(String path) {
+        try (ZipFile zip = new ZipFile(path)) {
+            return zip.stream().anyMatch(entry -> !entry.isDirectory()
+                    && entry.getName().matches("classes(?:[2-9]|[1-9][0-9]+)?\\.dex"));
+        } catch (IOException error) { throw new IllegalArgumentException("Unreadable APK", error); }
     }
     List<MethodData> findMethod(FindMethod query) {
         Map<String, MethodData> methods = new LinkedHashMap<>();

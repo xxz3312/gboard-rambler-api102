@@ -13,6 +13,17 @@ import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class) @Config(sdk=35)
 public final class RuntimeFeatureTest {
+    @Test public void resourceOnlySplitsDoNotEnterDexKit() throws Exception {
+        for (String entry : new String[]{"resources.arsc", "classes.dex", "classes12.dex"}) {
+            java.io.File apk=java.io.File.createTempFile("split-", ".apk");
+            try {
+                try (java.util.zip.ZipOutputStream zip=new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(apk))) {
+                    zip.putNextEntry(new java.util.zip.ZipEntry(entry)); zip.write(0); zip.closeEntry();
+                }
+                assertEquals(!entry.equals("resources.arsc"), HostDex.containsDex(apk.getPath()));
+            } finally { apk.delete(); }
+        }
+    }
     @Test public void unicodeDoesNotMisclassifyCjkSurrogatesOrPlainSymbols() {
         for (String text : new String[]{"中文", "𠮷", "𝄞", "→", "123", "©", "hello 😀", "😀 1", "\uD83D"})
             assertFalse(text, EmojiClassifier.isEmojiOnly(text));
