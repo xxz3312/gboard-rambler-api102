@@ -20,7 +20,7 @@ public final class SettingsActivityLaunchTest {
             assertTrue(dialog instanceof androidx.appcompat.app.AlertDialog);
             android.widget.ListView list=((androidx.appcompat.app.AlertDialog)dialog).getListView();
             list.performItemClick(list.getChildAt(0),0,list.getAdapter().getItemId(0));
-            android.content.Intent intent=org.robolectric.Shadows.shadowOf(activity).getNextStartedActivityForResult().intent;
+            android.content.Intent intent=org.robolectric.shadow.api.Shadow.<org.robolectric.shadows.ShadowActivity>extract(activity).getNextStartedActivityForResult().intent;
             assertEquals(android.content.Intent.ACTION_CREATE_DOCUMENT,intent.getAction());
             assertEquals("text/plain",intent.getType());
             assertTrue(intent.getStringExtra(android.content.Intent.EXTRA_TITLE).endsWith(".txt"));
