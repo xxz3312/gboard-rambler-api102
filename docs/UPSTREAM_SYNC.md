@@ -6,6 +6,8 @@ Reviewed PixelBoard 1.3.2 at
 - Added the upstream 18.5.3 Rambler selector descriptors and `oki.g` flag family.
   Exact signature checks and the semantic resolver remain mandatory; the new
   profile has not yet been confirmed on a physical device with Gboard 18.5.3.
+- Ported the optional 18.4.1/18.5.3 toolbar microphone activation predicate,
+  paired with the resolved selector owner and gated by the module/stock selection.
 - Followed the current Rambler policy: stop overriding four obsolete toolbar
   animation flags; set the deactivation delay to zero only while Rambler is enabled
   and the stock selection is not explicitly disabled.

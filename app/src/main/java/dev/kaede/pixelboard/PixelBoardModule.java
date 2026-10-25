@@ -93,11 +93,31 @@ public final class PixelBoardModule extends XposedModule {
         FeatureConfig.compatibility(
                 voiceCompatible && (!FeatureConfig.ramblerRequested() || voiceInstalled && getterInstalled),
                 writingCompatible && (!FeatureConfig.writingRequested() || getterInstalled));
-        if (FeatureConfig.rambler()) installDictationFilter(loader);
+        if (FeatureConfig.rambler()) {
+            installDictationFilter(loader);
+            installToolbarMic(loader, resolved.voice);
+        }
         if (FeatureConfig.writingTools()) {
             WritingToolsDiagnostics.probe(loader);
             if (FeatureConfig.diagnostics() && verifiedWritingTools184) observeWritingTools184State(loader);
             Log.i(TAG,"Writing Tools basic cloud; V2=false; backend=GBOARD_SERVER; local=false");
+        }
+    }
+    private void installToolbarMic(ClassLoader loader, RamblerBindings.Profile profile) {
+        // Pair the optional activation hook with the resolved selector's owner; never scan by B alone.
+        String owner = profile == null ? "" : profile.defaults.owner;
+        String mic = "fhv".equals(owner) ? "mql" : "fde".equals(owner) ? "mjz" : null;
+        if (mic == null) return;
+        try {
+            Method target = new TargetMethod(mic, "B", "boolean", "android.content.Context").resolve(loader);
+            if (!java.lang.reflect.Modifier.isStatic(target.getModifiers())) return;
+            hook(target).intercept(chain -> {
+                if (FeatureConfig.rambler() && RamblerSelection.mayExpose(hostContext)) return Boolean.TRUE;
+                return chain.proceed();
+            });
+            Log.i(TAG, "Installed selected-Rambler toolbar activation: " + mic);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+            Log.i(TAG, "Optional toolbar activation hook unavailable");
         }
     }
     private void installDictationFilter(ClassLoader loader) {
