@@ -1,0 +1,43 @@
+name: Finalize verified 0.2 release
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/finalize-0.2.yml']
+permissions:
+  contents: write
+concurrency:
+  group: publish-0.2
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify existing APK and publish by release ID
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh api "repos/$GITHUB_REPOSITORY/releases/423971359" > /tmp/verified-0.2.json
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          release=json.loads(Path('/tmp/verified-0.2.json').read_text())
+          assert release['tag_name']=='0.2' and not release['prerelease']
+          assert release['target_commitish']=='847381f6a102ef38d167acc420b84ce2c539d46a'
+          assert len(release['assets'])==1
+          asset=release['assets'][0]
+          assert asset['name']=='Gboard-Rambler-API102-0.2.apk' and asset['state']=='uploaded'
+          expected='0658301c4a4aae118dc1cd93eaa0bba5ffda82c6e81ca9cd60e79aaf1506f58b'
+          assert asset['digest']=='sha256:'+expected
+          assert expected in Path('README.md').read_text()
+          assert 'versionName = "0.2"' in Path('app/build.gradle.kts').read_text()
+          PY
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/423971359" -F draft=false -F prerelease=false -f make_latest=true > /tmp/published-0.2.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          release=json.loads(Path('/tmp/published-0.2.json').read_text())
+          assert release['tag_name']=='0.2' and not release['draft'] and not release['prerelease']
+          print(release['html_url'])
+          PY
