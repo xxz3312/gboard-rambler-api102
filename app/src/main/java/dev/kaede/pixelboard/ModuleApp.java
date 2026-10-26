@@ -34,6 +34,7 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
                 + " 扫描文本=" + local.getBoolean("scan_text", false)
                 + " 截图建议=" + local.getBoolean("screenshot_suggestions", false)
                 + " 圆角键=" + local.getBoolean("rounded_keys", false)
+                + "\n输入时同步剪贴板=" + local.getBoolean("clipboard_focus_sync",false)
                 + upstreamConfiguration(local)
                 + "\n剪贴板保留=" + ClipboardRetention.LABELS[ClipboardRetention.index(ClipboardRetention.sanitize(local.getString(ClipboardRetention.KEY, "stock")))]
                 + "\n服务连接：" + connected() + "\n" + lastSync;
@@ -53,6 +54,7 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
             SharedPreferences local = getSharedPreferences(FeatureConfig.GROUP, MODE_PRIVATE);
             SharedPreferences remote = current.getRemotePreferences(FeatureConfig.GROUP);
             SharedPreferences.Editor editor = remote.edit()
+                    .putBoolean("clipboard_focus_sync",local.getBoolean("clipboard_focus_sync",false))
                     .putString(ClipboardRetention.KEY, ClipboardRetention.sanitize(local.getString(ClipboardRetention.KEY, "stock")))
                     .putBoolean("rambler", local.getBoolean("rambler", false))
                     .remove("spellchecker")

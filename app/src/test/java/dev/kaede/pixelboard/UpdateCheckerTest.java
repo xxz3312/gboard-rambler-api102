@@ -18,9 +18,12 @@ public final class UpdateCheckerTest {
         assertTrue(UpdateChecker.compareVersions("0.1.9","0.1.35")<0);
         assertEquals(0,UpdateChecker.compareVersions("V0.1.35.0","0.1.35"));
         assertTrue(UpdateChecker.compareVersions("99999999999999999999","37")>0);
+        assertEquals(UpdateChecker.Status.CURRENT,UpdateChecker.parse(release("v0.1.35"),"0.2").status);
+        assertEquals(UpdateChecker.Status.CURRENT,UpdateChecker.parse(release("0.2"),"0.2").status);
+        assertEquals(UpdateChecker.Status.NEWER,UpdateChecker.parse(release("0.2.1"),"0.2").status);
         assertEquals(UpdateChecker.Status.NEWER,UpdateChecker.parse(release("v0.1.36"),"0.1.35").status);
         assertEquals(UpdateChecker.Status.CURRENT,UpdateChecker.parse(release("0.1.35"),"0.1.35").status);
-        assertEquals(UpdateChecker.Status.AHEAD,UpdateChecker.parse(release("v0.1.30"),"0.1.35").status);
+        assertEquals(UpdateChecker.Status.CURRENT,UpdateChecker.parse(release("v0.1.30"),"0.1.35").status);
     }
     @Test public void onlyBuildsLinksToTheProjectRelease() throws Exception {
         UpdateChecker.Result result=UpdateChecker.parse(release("v0.1.36"),"0.1.35");

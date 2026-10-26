@@ -61,6 +61,8 @@ public final class PixelBoardModule extends XposedModule {
     private void initializeForGboard(ClassLoader loader, Context context) {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
         FeatureConfig.initialize(this);
+        FeatureConfig.onChange(() -> CloudRuntimeStatus.send(hostContext,"CONFIG_APPLIED",
+                "runtimePolicy=updated; host cached UI/models may need restart"));
         try {
             PackageInfo pkg = context.getPackageManager().getPackageInfo(GBOARD, 0);
             verifiedWritingTools184 = pkg.getLongVersionCode() == 176027078L

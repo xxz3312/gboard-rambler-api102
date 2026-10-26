@@ -13,7 +13,7 @@ public final class UpdateChecker {
     static final String RELEASES = "https://github.com/xxz3312/gboard-rambler-api102/releases";
     private static final int MAX_BODY = 262144;
     private UpdateChecker() {}
-    public enum Status { NEWER, CURRENT, AHEAD }
+    public enum Status { NEWER, CURRENT }
     public static final class Result {
         public final String version, notes, url;
         public final Status status;
@@ -45,7 +45,7 @@ public final class UpdateChecker {
         if (notes.length()>4000) notes=notes.substring(0,4000)+"…";
         // Build the trusted destination from the validated numeric tag, not an API-supplied URL.
         return new Result(version,notes,RELEASES+"/tag/"+tag,
-                compared>0?Status.NEWER:compared<0?Status.AHEAD:Status.CURRENT);
+                compared>0?Status.NEWER:Status.CURRENT);
     }
     static String readBody(InputStream stream) throws IOException {
         ByteArrayOutputStream out=new ByteArrayOutputStream();

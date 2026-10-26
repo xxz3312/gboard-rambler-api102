@@ -56,6 +56,7 @@ final class RuntimeFeatureHooks {
             candidate = "skipped:"+error.getClass().getSimpleName();
             Log.w(TAG, "Candidate widget drawing contract unavailable", error);
         }
+        CloudRuntimeStatus.send(context,"CLIPBOARD_SYNC",ClipboardFocusSync.install(module,context,loader));
         CloudRuntimeStatus.send(context, "RUNTIME_HOOKS", "retentionPreference="+preference
                 +" retentionCalculation="+calculation+" emoji="+candidate+" config=listener; host caches may need restart");
     }

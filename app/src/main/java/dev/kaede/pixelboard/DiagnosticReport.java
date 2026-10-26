@@ -57,7 +57,9 @@ public final class DiagnosticReport {
             }
             String text=output.get(2,TimeUnit.SECONDS);
             if (process.exitValue()!=0) return "日志读取失败（可能未授权 Root）。\n"+text;
-            return text.trim().isEmpty()?"没有可见的模块 logcat；需要更完整日志时可选择 Root 导出。\n":text;
+            return text.trim().isEmpty() ? (rootLogs
+                    ? "Root 读取完成，但没有可见的 PixelBoardLS 日志；请结合上面的运行事件判断。\n"
+                    : "没有可见的模块 logcat；可选择 Root 导出补充跨进程日志。\n") : text;
         } catch (Exception error) {
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
             return "无法读取 logcat："+error.getClass().getSimpleName()+"；以上诊断报告仍可使用。\n";

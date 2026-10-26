@@ -14,6 +14,8 @@ public final class FeatureConfig {
     // SharedPreferences retains listeners weakly; keep this listener alive for the host process.
     private static SharedPreferences.OnSharedPreferenceChangeListener listener;
     private static volatile boolean ramblerCompatible, writingCompatible;
+    private static volatile Runnable onChange;
+    public static void onChange(Runnable callback) { onChange=callback; }
     private FeatureConfig() {}
     static final class Snapshot {
         final Set<String> enabled;
@@ -41,7 +43,12 @@ public final class FeatureConfig {
         }
     }
     static void reload(SharedPreferences prefs) {
-        try { state = new Snapshot(prefs.getAll()); }
+        try {
+            Snapshot previous=state, next=new Snapshot(prefs.getAll());
+            state=next;
+            Runnable callback=onChange;
+            if (callback!=null && (!previous.enabled.equals(next.enabled) || !previous.retention.equals(next.retention))) callback.run();
+        }
         catch (RuntimeException error) { Log.w(TAG, "Cannot reload settings; keeping last snapshot", error); }
     }
     public static boolean enabled(UpstreamFeature feature) { return state.has(feature.key); }
@@ -50,6 +57,7 @@ public final class FeatureConfig {
         for (UpstreamFeature feature : UpstreamFeature.values()) if (enabled(feature)) selected.add(feature);
         return selected.toString();
     }
+    public static boolean clipboardSync() { return state.has("clipboard_focus_sync"); }
     public static String retention() { return state.retention; }
     public static boolean scanText() { return state.has("scan_text"); }
     public static boolean screenshot() { return state.has("screenshot_suggestions"); }
