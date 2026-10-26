@@ -45,7 +45,7 @@ final class ClipboardFocusSync {
         int count=0;
         for (ClipboardManager.OnPrimaryClipChangedListener callback:current) try {
             callback.onPrimaryClipChanged(); count++;
-        } catch (RuntimeException error) { Log.w("PixelBoardLS","Native clipboard callback failed",error); }
+        } catch (RuntimeException | LinkageError error) { Log.w("PixelBoardLS","Native clipboard callback failed",error); }
         return count;
     }
     static String install(XposedModule module, Context context, ClassLoader loader) {
