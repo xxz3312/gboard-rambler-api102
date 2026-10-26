@@ -26,14 +26,24 @@ final class RuntimeFeatureHooks {
         }
         try {
             RuntimeHookResolver.RetentionTarget target = RuntimeHookResolver.retention(context, loader);
+            java.util.concurrent.atomic.AtomicReference<String> lastRead=new java.util.concurrent.atomic.AtomicReference<>("");
             module.hook(target.method).intercept(chain -> {
                 Object original;
                 try (RetentionReadScope ignored = new RetentionReadScope()) { original = chain.proceed(); }
-                return target.duration ? ClipboardRetention.millis(FeatureConfig.retention(), (Long) original) : original;
+                String selected=FeatureConfig.retention();
+                Object result=target.duration ? ClipboardRetention.millis(selected, (Long) original) : original;
+                if (FeatureConfig.diagnostics()) {
+                    String detail="strategy="+target.strategy+" selected="+selected
+                            +(target.duration?" nativeMs="+original+" effectiveMs="+result:"");
+                    if (!detail.equals(lastRead.getAndSet(detail))) CloudRuntimeStatus.send(context,"RETENTION_READ",detail);
+                }
+                return result;
             });
-            calculation = target.duration ? "installed(semantic-ms)" : "installed(semantic-reader)";
+            calculation = "installed("+target.strategy+")";
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
-            calculation = "skipped:"+error.getClass().getSimpleName();
+            String reason=error.getMessage();
+            if (reason!=null && reason.length()>100) reason=reason.substring(0,100);
+            calculation = "skipped:"+error.getClass().getSimpleName()+(reason==null?"":":"+reason);
             Log.w(TAG, "No unique retention calculation; retention override inactive", error);
         }
         try {

@@ -1,6 +1,6 @@
 package dev.kaede.pixelboard;
 
-/** Hours match Gboard's native clipboard_history_retention preference. No host writes. */
+/** Module selections in hours; native getter overrides use milliseconds. No host writes. */
 public final class ClipboardRetention {
     public static final String KEY = "clipboard_retention";
     public static final String NATIVE_KEY = "clipboard_history_retention";
