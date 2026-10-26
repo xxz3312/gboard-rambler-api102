@@ -2,7 +2,7 @@ name: Android CI
 on:
   workflow_dispatch:
   push:
-    branches: [main, writing-tools-upstream-port, port-ocr-screenshot-belka, port-more-upstream-features, universal-upstream-hooks]
+    branches: [main, writing-tools-upstream-port, port-ocr-screenshot-belka, port-more-upstream-features, universal-upstream-hooks, fix-clipboard-retention]
 jobs:
   debug:
     runs-on: ubuntu-latest
