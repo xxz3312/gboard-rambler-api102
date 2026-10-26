@@ -20,7 +20,7 @@
 
 新增输入焦点剪贴板同步（支持跨厂商的 Android 原生监听器）、运行时配置更新回执与设置页 TalkBack 焦点恢复。支持 TXT 日志导出与可选 Root 跨进程模块日志；手动检查最新正式 Release，当前版本等于或高于 Release 时提示“已是最新版”，仅较低时提示更新。详见 [日志与更新](docs/LOGS_AND_UPDATES.md)。
 
-Gboard 18.4.4 已有 Rambler、写作工具、附加功能及候选绘制 Hook 安装记录，并观察到 OCR、圆角键及部分输入功能的 flag 读取。当前日志未匹配到剪贴板自定义时限计算，默认“遵循 Gboard”不受影响；此项兼容性限制不能视为全部功能已通过实测。详见 [通用 Hook 说明](docs/UNIVERSAL_HOOKS.md)。
+Gboard 18.4.4 已有 Rambler、写作工具、附加功能及候选绘制 Hook 安装记录，并观察到 OCR、圆角键及部分输入功能的 flag 读取。0.2.1 已修复剪贴板自定义时限定位，用户日志确认 18.4.4 的原生 getter 匹配及 7 天配置读取；实际跨天清理行为仍需观察。详见 [通用 Hook 说明](docs/UNIVERSAL_HOOKS.md)。
 
 ## 已发布版本功能范围
 
