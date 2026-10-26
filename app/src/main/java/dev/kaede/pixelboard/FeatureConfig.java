@@ -3,51 +3,78 @@ package dev.kaede.pixelboard;
 import android.content.SharedPreferences;
 import android.util.Log;
 import io.github.libxposed.api.XposedModule;
+import java.util.*;
 
-/** Read-only framework-backed config in hooked Gboard. No ContentProvider IPC. */
+/** A single immutable snapshot; listeners never publish a partially read configuration. */
 public final class FeatureConfig {
     private static final String TAG = "PixelBoardLS";
     public static final String GROUP = "features";
-    private static volatile boolean rambler, diagnostics, writingTools, scanText, screenshot, roundedKeys;
-    private static volatile java.util.Set<UpstreamFeature> extraFeatures = java.util.Collections.emptySet();
-    public static boolean enabled(UpstreamFeature feature) { return extraFeatures.contains(feature); }
-    public static String upstreamSummary() { return extraFeatures.toString(); }
+    private static volatile Snapshot state = new Snapshot(Collections.emptyMap());
+    private static SharedPreferences remote;
+    // SharedPreferences retains listeners weakly; keep this listener alive for the host process.
+    private static SharedPreferences.OnSharedPreferenceChangeListener listener;
+    private static volatile boolean ramblerCompatible, writingCompatible;
+    private static volatile Runnable onChange;
+    public static void onChange(Runnable callback) { onChange=callback; }
     private FeatureConfig() {}
+    static final class Snapshot {
+        final Set<String> enabled;
+        final String retention;
+        Snapshot(Map<String, ?> values) {
+            Set<String> selected = new HashSet<>();
+            for (Map.Entry<String, ?> item : values.entrySet())
+                if (Boolean.TRUE.equals(item.getValue())) selected.add(item.getKey());
+            enabled = Collections.unmodifiableSet(selected);
+            retention = ClipboardRetention.sanitize(values.get(ClipboardRetention.KEY));
+        }
+        boolean has(String name) { return enabled.contains(name); }
+    }
     public static void initialize(XposedModule module) {
-        rambler = diagnostics = writingTools = scanText = screenshot = roundedKeys = false;
-        extraFeatures = java.util.Collections.emptySet();
+        state = new Snapshot(Collections.emptyMap());
         try {
-            SharedPreferences p = module.getRemotePreferences(GROUP);
-            rambler = p.getBoolean("rambler", false);
-            diagnostics = p.getBoolean("diagnostics", false);
-            writingTools = p.getBoolean("writing_tools", false);
-            scanText = p.getBoolean("scan_text", false);
-            screenshot = p.getBoolean("screenshot_suggestions", false);
-            roundedKeys = p.getBoolean("rounded_keys", false);
-            java.util.Set<UpstreamFeature> selected = java.util.EnumSet.noneOf(UpstreamFeature.class);
-            for (UpstreamFeature feature : UpstreamFeature.values())
-                if (p.getBoolean(feature.key, false)) selected.add(feature);
-            extraFeatures = java.util.Collections.unmodifiableSet(selected);
-            module.log(Log.INFO, TAG, "Remote settings read: rambler=" + rambler
-                    + ", diagnostics=" + diagnostics
-                    + ", writingTools=" + writingTools);
+            remote = module.getRemotePreferences(GROUP);
+            reload(remote);
+            listener = (prefs, key) -> reload(prefs);
+            remote.registerOnSharedPreferenceChangeListener(listener);
+            reload(remote);
+            module.log(Log.INFO, TAG, "Remote settings loaded; live policy listener registered");
         } catch (RuntimeException e) {
-            module.log(Log.ERROR, TAG, "Remote settings unavailable; fail closed", e);
+            module.log(Log.ERROR, TAG, "Remote settings unavailable; defaults retained", e);
         }
     }
-    private static volatile boolean ramblerCompatible, writingCompatible;
-    public static boolean scanText() { return scanText; }
-    public static boolean screenshot() { return screenshot; }
-    public static boolean roundedKeys() { return roundedKeys; }
-    public static boolean extrasRequested() { return scanText || screenshot || roundedKeys || !extraFeatures.isEmpty(); }
-    public static boolean ramblerRequested() { return rambler; }
-    public static boolean writingRequested() { return writingTools; }
+    static void reload(SharedPreferences prefs) {
+        try {
+            Snapshot previous=state, next=new Snapshot(prefs.getAll());
+            state=next;
+            Runnable callback=onChange;
+            if (callback!=null && (!previous.enabled.equals(next.enabled) || !previous.retention.equals(next.retention))) callback.run();
+        }
+        catch (RuntimeException error) { Log.w(TAG, "Cannot reload settings; keeping last snapshot", error); }
+    }
+    public static boolean enabled(UpstreamFeature feature) { return state.has(feature.key); }
+    public static String upstreamSummary() {
+        Set<UpstreamFeature> selected = EnumSet.noneOf(UpstreamFeature.class);
+        for (UpstreamFeature feature : UpstreamFeature.values()) if (enabled(feature)) selected.add(feature);
+        return selected.toString();
+    }
+    public static boolean clipboardSync() { return state.has("clipboard_focus_sync"); }
+    public static String retention() { return state.retention; }
+    public static boolean scanText() { return state.has("scan_text"); }
+    public static boolean screenshot() { return state.has("screenshot_suggestions"); }
+    public static boolean roundedKeys() { return state.has("rounded_keys"); }
+    public static boolean extrasRequested() {
+        Snapshot current = state;
+        if (current.has("scan_text") || current.has("screenshot_suggestions") || current.has("rounded_keys")) return true;
+        for (UpstreamFeature feature : UpstreamFeature.values())
+            if (feature.usesFlags() && current.has(feature.key)) return true;
+        return false;
+    }
+    public static boolean ramblerRequested() { return state.has("rambler"); }
+    public static boolean writingRequested() { return state.has("writing_tools"); }
     public static void compatibility(boolean voice, boolean writing) {
         ramblerCompatible=voice; writingCompatible=writing;
     }
-    public static boolean rambler() { return rambler && ramblerCompatible; }
-    public static boolean diagnostics() { return diagnostics; }
-    public static boolean writingTools() { return writingTools && writingCompatible; }
+    public static boolean rambler() { return ramblerRequested() && ramblerCompatible; }
+    public static boolean diagnostics() { return state.has("diagnostics"); }
+    public static boolean writingTools() { return writingRequested() && writingCompatible; }
 }
-
-

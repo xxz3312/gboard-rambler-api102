@@ -61,6 +61,8 @@ public final class PixelBoardModule extends XposedModule {
     private void initializeForGboard(ClassLoader loader, Context context) {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
         FeatureConfig.initialize(this);
+        FeatureConfig.onChange(() -> CloudRuntimeStatus.send(hostContext,"CONFIG_APPLIED",
+                "runtimePolicy=updated; host cached UI/models may need restart"));
         try {
             PackageInfo pkg = context.getPackageManager().getPackageInfo(GBOARD, 0);
             verifiedWritingTools184 = pkg.getLongVersionCode() == 176027078L
@@ -80,9 +82,9 @@ public final class PixelBoardModule extends XposedModule {
                 +" writingTools="+FeatureConfig.writingTools()+" version="+gboardVersion(context));
         Log.i(TAG,"Compatibility rambler="+voiceCompatible+" writing="+writingCompatible
                 +" resolver="+resolved.source);
-        boolean voiceInstalled=!FeatureConfig.rambler() || installRambler(loader,resolved.voice);
+        boolean voiceInstalled=voiceCompatible && installRambler(loader,resolved.voice);
         boolean getterInstalled=false;
-        if ((FeatureConfig.rambler() || FeatureConfig.writingTools() || FeatureConfig.extrasRequested()) && resolved.flags!=null)
+        if (resolved.flags!=null)
             getterInstalled=installFlagGetter(resolved.flags);
         CloudRuntimeStatus.send(hostContext,"HOOKS",
                 "ramblerRequested="+FeatureConfig.ramblerRequested()
@@ -92,7 +94,8 @@ public final class PixelBoardModule extends XposedModule {
                 +" getterInstalled="+getterInstalled
                 +" extrasRequested="+FeatureConfig.extrasRequested()
                 +" extrasInstalled="+(FeatureConfig.extrasRequested() && getterInstalled));
-        boolean roundedPreference = !FeatureConfig.roundedKeys() || getterInstalled && installRoundedPreference(loader);
+        boolean roundedPreference = installRoundedPreference(loader);
+        RuntimeFeatureHooks.install(this, hostContext, loader);
         CloudRuntimeStatus.send(hostContext,"EXTRAS",
                 "scanText="+FeatureConfig.scanText()+" screenshot="+FeatureConfig.screenshot()
                 +" roundedKeys="+FeatureConfig.roundedKeys()+" getter="+getterInstalled
@@ -100,8 +103,8 @@ public final class PixelBoardModule extends XposedModule {
         CloudRuntimeStatus.send(hostContext,"UPSTREAM",
                 "requested="+FeatureConfig.upstreamSummary()+" getter="+getterInstalled);
         FeatureConfig.compatibility(
-                voiceCompatible && (!FeatureConfig.ramblerRequested() || voiceInstalled && getterInstalled),
-                writingCompatible && (!FeatureConfig.writingRequested() || getterInstalled));
+                voiceCompatible && voiceInstalled && getterInstalled,
+                writingCompatible && getterInstalled);
         if (FeatureConfig.writingTools()) {
             WritingToolsDiagnostics.probe(loader);
             if (FeatureConfig.diagnostics() && verifiedWritingTools184) observeWritingTools184State(loader);

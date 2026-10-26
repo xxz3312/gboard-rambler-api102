@@ -27,6 +27,11 @@ public final class TargetMethod {
             case "boolean": return boolean.class;
             case "int": return int.class;
             case "long": return long.class;
+            case "byte": return byte.class;
+            case "short": return short.class;
+            case "char": return char.class;
+            case "float": return float.class;
+            case "double": return double.class;
             default: return Class.forName(name, false, loader);
         }
     }

@@ -29,7 +29,20 @@ public enum UpstreamFeature {
             "enable_last_word_rule_based_concept_prediction", "enable_suffix_rule_based_concept_prediction",
             "enable_emoji_suggestion_from_top_candidate", "enable_predictions_from_emoji_shortcuts",
             "enable_ngram_emoji_shortcuts_by_spans", "enable_ngram_emoji_shortcuts_for_prediction",
-            "retain_emoji_shortcut_candidates_on_selection");
+            "retain_emoji_shortcut_candidates_on_selection"),
+    GLIDE_TYPING("glide_typing", "滑行输入增强", "启用手势流与两阶段解码；需语言模型支持",
+            "update_streaming_touch_data_set_is_gesture", "enable_two_stage_decoder"),
+    AUTO_CORRECTION("auto_correction", "自动纠错增强", "改善空格纠错与候选提交；保留原有应用和语言限制",
+            "enable_space_transposition_post_correction", "enable_pk_spatial_model_features",
+            "enable_pk_auto_correction_trigger_predictor", "enable_post_correction_trigger_predictor",
+            "populate_preemptive_next_key_predictions", "auto_correct_with_replace_text",
+            "enable_revert_auto_correct_on_pk", "enable_decoder_response_wait_without_lock",
+            "try_initialize_decoder_after_lm_loads"),
+    INCOGNITO("incognito_entry", "手动无痕入口", "显示 Gboard 原生无痕模式切换入口",
+            "enable_incognito_mode_entry_point", "allow_incognito_mode_switch"),
+    EMOGEN("emogen", "AI 表情生成入口", "仅开放原生入口；服务、地区与账号支持仍由 Gboard 决定",
+            "enable_emogen", "emogen_entry_point", "emogen_feature_enabled", "emogen_in_access_points"),
+    OPAQUE_EMOJI("opaque_emoji", "候选表情完整色彩", "绘制候选表情时恢复不透明色彩；普通文字保持原样");
 
     public final String key, title, summary;
     private final Map<String, Object> overrides = new HashMap<>();
@@ -42,6 +55,7 @@ public enum UpstreamFeature {
     }
 
     static {
+        AUTO_CORRECTION.overrides.put("delay_to_wait_for_suggestions_before_commit_ms", 150L);
         SMART_COMPOSE.overrides.put("smart_compose_status", 1L);
         // Use the actual upstream runtime values, rather than README's older threshold of 1.
         FAST_LEARNING.overrides.put("intended_oov_min_count", 2L);
@@ -56,6 +70,7 @@ public enum UpstreamFeature {
         for (UpstreamFeature feature : values()) if (feature.overrides.containsKey(name)) return true;
         return false;
     }
+    boolean usesFlags() { return !overrides.isEmpty(); }
 
     static Object transform(String name, Object original, Predicate<UpstreamFeature> enabled) {
         if (name == null || original == null) return original;

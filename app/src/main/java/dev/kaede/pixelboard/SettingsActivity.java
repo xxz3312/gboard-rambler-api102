@@ -41,9 +41,16 @@ public final class SettingsActivity extends AppCompatActivity {
     private MaterialSwitch launcherSwitch;
     private boolean refreshingLauncher;
     private LinearLayout root;
-    private MaterialTextView frameworkSummary, compatibilityTitle, compatibilitySummary;
-    private View restartAction;
+    private MaterialTextView frameworkSummary, compatibilityTitle, compatibilitySummary, retentionSummary;
+    private View restartAction, exportAction, updateAction;
+    private boolean exportRootLogs, exportPending, exportRunning, updateRunning;
+    private final androidx.activity.result.ActivityResultLauncher<String> createLogDocument =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"), uri -> {
+                exportPending = false;
+                if (uri != null) saveDiagnosticLog(uri); else if (exportAction != null) exportAction.setEnabled(true);
+            });
     private TextView detailText;
+    private java.lang.ref.WeakReference<View> lastActionView=new java.lang.ref.WeakReference<>(null);
     private final android.os.Handler statusHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable statusTicker = new Runnable() {
         @Override public void run() {
@@ -69,6 +76,10 @@ public final class SettingsActivity extends AppCompatActivity {
         super.onCreate(state);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         prefs = getSharedPreferences("features", MODE_PRIVATE);
+        if (state != null) {
+            exportRootLogs = state.getBoolean("export_root", false);
+            exportPending = state.getBoolean("export_pending", false);
+        }
         root = column();
         int surface = color(com.google.android.material.R.attr.colorSurface);
         root.setBackgroundColor(surface);
@@ -109,13 +120,13 @@ public final class SettingsActivity extends AppCompatActivity {
         toggle(features, "scan_text", "扫描文本 / 相机 OCR", "启用 Gboard 工具栏中的扫描文本", R.drawable.ic_edit, false);
         divider(features);
         toggle(features, "screenshot_suggestions", "截图浮动建议", "在 Gboard 中显示最近截图与图片建议", R.drawable.ic_info, false);
-        MaterialTextView hint = label("更改功能后，请重新启动 Gboard。",
+        MaterialTextView hint = label("同步后运行时策略可更新；Gboard 已缓存的界面或模型需重启。",
                 com.google.android.material.R.style.TextAppearance_Material3_BodySmall,
                 com.google.android.material.R.attr.colorOnSurfaceVariant);
         hint.setPadding(dp(16), dp(8), dp(16), 0);
         list.addView(hint);
 
-        section(list, "输入与表情（实验性）");
+        section(list, "输入与表情");
         LinearLayout upstream = group(list);
         boolean firstUpstream = true;
         for (UpstreamFeature feature : UpstreamFeature.values()) {
@@ -123,12 +134,39 @@ public final class SettingsActivity extends AppCompatActivity {
             firstUpstream = false;
             toggle(upstream, feature.key, feature.title, feature.summary, R.drawable.ic_edit, false);
         }
-        MaterialTextView upstreamHint = label("这些开关启用 Gboard 已有能力，实际入口与效果取决于当前版本和语言。修改后重启 Gboard。",
+        MaterialTextView upstreamHint = label("这些开关启用 Gboard 已有能力，实际入口与效果取决于当前版本和语言。同步后重新打开键盘；若界面未刷新，请重启 Gboard。",
                 com.google.android.material.R.style.TextAppearance_Material3_BodySmall,
                 com.google.android.material.R.attr.colorOnSurfaceVariant);
         upstreamHint.setPadding(dp(16), dp(8), dp(16), 0);
         list.addView(upstreamHint);
 
+        section(list, "剪贴板");
+        LinearLayout clipboard = group(list);
+        toggle(clipboard,"clipboard_focus_sync","输入时同步剪贴板","在键盘获得输入焦点时补发原生同步通知",R.drawable.ic_sync,false);
+        divider(clipboard);
+        Row retentionRow=row(clipboard, "剪贴板保留时长", "自定义时长需版本适配；默认遵循 Gboard", R.drawable.ic_info, () -> {
+            android.content.SharedPreferences prefs = getSharedPreferences("features", MODE_PRIVATE);
+            if (CloudRuntimeStatus.retentionUnavailable(this)) {
+                new MaterialAlertDialogBuilder(this).setTitle("当前 Gboard 暂不支持自定义保留时长")
+                        .setMessage("未匹配到时限计算方法，当前遵循 Gboard 原生清理策略。其他功能不受影响。")
+                        .setNegativeButton("关闭",null)
+                        .setPositiveButton("遵循 Gboard",(dialog,which) -> {
+                            prefs.edit().putString(ClipboardRetention.KEY,"stock").apply();
+                            ((ModuleApp)getApplication()).sync();
+                        }).show();
+                return;
+            }
+            int selected = ClipboardRetention.index(prefs.getString(ClipboardRetention.KEY, "stock"));
+            new MaterialAlertDialogBuilder(this).setTitle("剪贴板保留时长")
+                    .setSingleChoiceItems(ClipboardRetention.LABELS, selected, (dialog, which) -> {
+                        prefs.edit().putString(ClipboardRetention.KEY, ClipboardRetention.VALUES[which]).apply();
+                        ((ModuleApp) getApplication()).sync();
+                        dialog.dismiss();
+                        Snackbar.make(root, "已保存："+ClipboardRetention.LABELS[which]+"；实际清理需验证", Snackbar.LENGTH_LONG).show();
+                    }).setNegativeButton("关闭", null).show();
+        });
+
+        retentionSummary=retentionRow.summary;
         section(list, "外观");
         LinearLayout appearance = group(list);
         toggle(appearance, "rounded_keys", "Material 3 表现力圆角键", "启用 Belka UI 胶囊形按键", R.drawable.ic_edit, false);
@@ -179,8 +217,18 @@ public final class SettingsActivity extends AppCompatActivity {
         divider(status);
         toggle(status, "diagnostics", "诊断日志", "记录适配与 Hook 状态", R.drawable.ic_diagnostics, false);
 
+        divider(status);
+        exportAction = row(status, "导出日志", "保存为 TXT，可选包含 Root 日志", R.drawable.ic_diagnostics,
+                this::chooseLogExport).view;
+        exportAction.setId(R.id.export_logs);
+        exportAction.setEnabled(!exportPending);
+
         section(list, "关于");
         LinearLayout about = group(list);
+        updateAction = row(about, "检查更新", "检查 GitHub 最新正式版本", R.drawable.ic_sync,
+                this::checkForUpdates).view;
+        updateAction.setId(R.id.check_updates);
+        divider(about);
         row(about, "使用说明", "网络、语言与使用范围", R.drawable.ic_help, () ->
                 new MaterialAlertDialogBuilder(this).setTitle("使用说明")
                         .setMessage("AI 写作工具需要联网，并完成 Gboard 的同意流程。建议先在普通便签中用英语测试；部分应用可能被 Gboard 排除。\n\n开关开启、配置同步或适配成功不代表云端请求成功。修改功能后，请强制停止并重新唤起 Gboard。")
@@ -198,6 +246,103 @@ public final class SettingsActivity extends AppCompatActivity {
         systemBars.setAppearanceLightNavigationBars(light);
         ViewCompat.requestApplyInsets(root);
         refreshStatus();
+    }
+
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        View target=lastActionView.get();
+        android.view.accessibility.AccessibilityManager manager=(android.view.accessibility.AccessibilityManager)
+                getSystemService(ACCESSIBILITY_SERVICE);
+        if (focused && target!=null && manager!=null && manager.isTouchExplorationEnabled()) {
+            lastActionView.clear();
+            target.post(() -> {
+                if (target.isAttachedToWindow() && target.isShown())
+                    target.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS,null);
+            });
+        }
+    }
+    @Override protected void onSaveInstanceState(Bundle state) {
+        state.putBoolean("export_root", exportRootLogs);
+        state.putBoolean("export_pending", exportPending);
+        super.onSaveInstanceState(state);
+    }
+    private void chooseLogExport() {
+        if (exportPending || exportRunning) return;
+        new MaterialAlertDialogBuilder(this).setTitle("导出日志")
+                .setItems(new String[]{"诊断日志（无需 Root）", "包含 Gboard 模块日志（需要 Root）"}, (dialog, which) -> {
+                    exportRootLogs = which == 1;
+                    exportPending = true;
+                    exportAction.setEnabled(false);
+                    String name="Gboard-Rambler-"+CloudRuntimeStatus.VERSION+"-"
+                            +new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.US).format(new java.util.Date())+".txt";
+                    try { createLogDocument.launch(name); }
+                    catch (RuntimeException error) {
+                        exportPending = false; exportAction.setEnabled(true);
+                        Toast.makeText(this,"无法打开文件保存界面",Toast.LENGTH_LONG).show();
+                    }
+                }).setNegativeButton("取消", null).show();
+    }
+    private void saveDiagnosticLog(android.net.Uri uri) {
+        exportRunning = true;
+        if (exportAction != null) exportAction.setEnabled(false);
+        android.content.Context app = getApplicationContext();
+        boolean rootLogs = exportRootLogs;
+        new Thread(() -> {
+            String message;
+            try {
+                String report = DiagnosticReport.build(app, rootLogs);
+                try (java.io.OutputStream stream = app.getContentResolver().openOutputStream(uri,"wt")) {
+                    if (stream == null) throw new java.io.IOException("无法打开目标文件");
+                    stream.write(report.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                }
+                message="日志已保存";
+            } catch (Exception error) {
+                DiagnosticLog.record(app,"EXPORT_ERROR",android.util.Log.getStackTraceString(error));
+                message="日志保存失败："+error.getClass().getSimpleName();
+            }
+            String result=message;
+            runOnUiThread(() -> {
+                exportRunning = false;
+                if (isDestroyed() || isFinishing()) return;
+                exportAction.setEnabled(true);
+                Toast.makeText(this,result,Toast.LENGTH_LONG).show();
+            });
+        },"diagnostic-export").start();
+    }
+    private void checkForUpdates() {
+        if (updateRunning) return;
+        updateRunning = true; updateAction.setEnabled(false);
+        Snackbar.make(root,"正在检查更新…",Snackbar.LENGTH_SHORT).show();
+        new Thread(() -> {
+            UpdateChecker.Result release=null; String failure=null;
+            try { release=UpdateChecker.check(CloudRuntimeStatus.VERSION); }
+            catch (Exception error) {
+                failure=error instanceof java.io.IOException ? error.getMessage() : "无法解析版本信息";
+                if (failure == null || failure.isEmpty()) failure="网络连接失败，请稍后重试";
+            }
+            UpdateChecker.Result result=release; String message=failure;
+            runOnUiThread(() -> {
+                updateRunning = false;
+                if (isDestroyed() || isFinishing()) return;
+                updateAction.setEnabled(true);
+                if (result == null) {
+                    new MaterialAlertDialogBuilder(this).setTitle("检查更新失败").setMessage(message)
+                            .setNegativeButton("关闭", null).setPositiveButton("打开发布页", (dialog, which) -> openReleasePage(UpdateChecker.RELEASES)).show();
+                    return;
+                }
+                String title=result.status==UpdateChecker.Status.NEWER ? "发现新版本 "+result.version : "已是最新版";
+                String detail="当前版本："+CloudRuntimeStatus.VERSION+"\n最新正式版："+result.version
+                        +(result.notes.isEmpty()?"":"\n\n"+result.notes);
+                new MaterialAlertDialogBuilder(this).setTitle(title).setMessage(detail)
+                        .setNegativeButton("关闭", null)
+                        .setPositiveButton(result.status==UpdateChecker.Status.NEWER?"前往下载":"查看发布页",
+                                (dialog, which) -> openReleasePage(result.url)).show();
+            });
+        },"release-check").start();
+    }
+    private void openReleasePage(String url) {
+        try { startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))); }
+        catch (RuntimeException error) { Toast.makeText(this,"无法打开发布页",Toast.LENGTH_LONG).show(); }
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
@@ -272,7 +417,7 @@ public final class SettingsActivity extends AppCompatActivity {
             prefs.edit().putBoolean(key, checked).apply();
             ((ModuleApp) getApplication()).sync();
             if (!"diagnostics".equals(key))
-                Snackbar.make(root, "重新启动 Gboard 后生效", Snackbar.LENGTH_SHORT).show();
+                Snackbar.make(root, "已同步运行时策略；缓存界面未刷新时重启 Gboard", Snackbar.LENGTH_SHORT).show();
         });
         return toggle;
     }
@@ -313,7 +458,7 @@ public final class SettingsActivity extends AppCompatActivity {
             getTheme().resolveAttribute(android.R.attr.selectableItemBackground, background, true);
             row.setBackgroundResource(background.resourceId);
             row.setFocusable(true);
-            row.setOnClickListener(v -> action.run());
+            row.setOnClickListener(v -> { lastActionView=new java.lang.ref.WeakReference<>(v); action.run(); });
         }
         group.addView(row, new LinearLayout.LayoutParams(-1, -2));
         return new Row(row, headline, supporting);
@@ -321,6 +466,8 @@ public final class SettingsActivity extends AppCompatActivity {
     private void refreshStatus() {
         if (frameworkSummary == null) return;
         setTextIfChanged(frameworkSummary, ModuleApp.connected() ? "已连接 LSPosed" : "等待 LSPosed 服务连接");
+        if (retentionSummary!=null) setTextIfChanged(retentionSummary, CloudRuntimeStatus.retentionUnavailable(this)
+                ? "当前版本未匹配自定义时限，遵循 Gboard" : "自定义时长需版本适配；默认遵循 Gboard");
         boolean error = CloudRuntimeStatus.unsupported(this);
         String report = CloudRuntimeStatus.report(this);
         setTextIfChanged(compatibilityTitle, error

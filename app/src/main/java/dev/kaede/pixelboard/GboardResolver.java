@@ -5,14 +5,13 @@ import android.content.SharedPreferences;
 import java.io.File;
 import java.lang.reflect.*;
 import java.util.*;
-import org.luckypray.dexkit.DexKitBridge;
 import org.luckypray.dexkit.query.FindMethod;
 import org.luckypray.dexkit.query.matchers.MethodMatcher;
 import org.luckypray.dexkit.result.MethodData;
 
 /** Unique semantic matches; never force a result when signatures are ambiguous. */
 public final class GboardResolver {
-    private static final String REV = "semantic-cloud-1";
+    private static final String REV = "semantic-cloud-2-splits";
     private static final String VOICE = RamblerBindings.VOICE;
     private static final String EXTENSION =
             "com/google/android/apps/inputmethod/libs/agenticdictation/extension/AgenticDictationExtension";
@@ -57,7 +56,7 @@ public final class GboardResolver {
         }
         try {
             System.loadLibrary("dexkit");
-            try (DexKitBridge bridge = DexKitBridge.create(context.getApplicationInfo().sourceDir)) {
+            try (HostDex bridge = new HostDex(context)) {
                 List<Method> getters = new ArrayList<>();
                 for (MethodData candidate : bridge.findMethod(FindMethod.create().matcher(
                         MethodMatcher.create().returnType("java.lang.Object").paramCount(0)
@@ -98,7 +97,7 @@ public final class GboardResolver {
                     && "18.4.1".equals(knownVoice.id),"verified-signature-fallback");
         }
     }
-    private static String fingerprint(Context context) {
+    static String fingerprint(Context context) {
         android.content.pm.ApplicationInfo app=context.getApplicationInfo();
         StringBuilder key=new StringBuilder(REV);
         List<String> paths=new ArrayList<>(); paths.add(app.sourceDir);
@@ -128,7 +127,7 @@ public final class GboardResolver {
         if(candidates.size()!=1) throw new IllegalArgumentException("Match count="+candidates.size());
         return candidates.get(0);
     }
-    private static boolean hasString(DexKitBridge bridge,String value) {
+    private static boolean hasString(HostDex bridge,String value) {
         return !bridge.findMethod(FindMethod.create().matcher(MethodMatcher.create().usingStrings(value))).isEmpty();
     }
     private static TargetMethod target(Method method) {
@@ -137,7 +136,7 @@ public final class GboardResolver {
         return new TargetMethod(method.getDeclaringClass().getName(),method.getName(),
                 method.getReturnType().getName(),args);
     }
-    private static RamblerBindings.Profile resolveVoice(DexKitBridge bridge,ClassLoader loader)
+    private static RamblerBindings.Profile resolveVoice(HostDex bridge,ClassLoader loader)
             throws ReflectiveOperationException {
         Class<?> voice=Class.forName(VOICE,false,loader);
         Class<?> selector=Class.forName(RamblerBindings.SELECTOR,false,loader);
