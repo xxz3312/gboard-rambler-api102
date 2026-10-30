@@ -18,6 +18,7 @@ public final class WritingToolsFlagPolicy {
             "config_proofread",
             "writing_tools",
             "writing_tools_enable_stable_entrance",
+            "enable_writing_tools_replace_button",
             "enable_writing_tools_cooperative_mode",
             "writing_helper_on_selected_text",
             "writing_helper_enable_text_stylization_internal",
@@ -50,18 +51,25 @@ public final class WritingToolsFlagPolicy {
                 || "enable_on_device_proofread".equals(name)
                 || "enable_writing_tools_voice_commands".equals(name)
                 || "nga_lab_modeless_smartedit_regex_version".equals(name)
+                || "proofread_supported_apps".equals(name)
                 || "writing_tools_v2_backend_type".equals(name));
     }
     public static boolean isToolbarFlag(String name) {
         return "enable_writing_tools_v2_on_toolbar".equals(name);
     }
     public static Object transform(String name, Object original, Context context) {
-        return overrideValue(name, original, context != null && FeatureConfig.writingTools());
+        return overrideValue(name, original, context != null && FeatureConfig.writingTools(),
+                FeatureConfig.enabled(UpstreamFeature.WRITING_ALL_APPS));
     }
 
     // Pure typed policy, also exercised by host-side regression tests.
     static Object overrideValue(String name, Object original, boolean enabled) {
+        return overrideValue(name, original, enabled, false);
+    }
+    static Object overrideValue(String name, Object original, boolean enabled, boolean allApps) {
         if (!enabled || !targeted(name)) return original;
+        if ("proofread_supported_apps".equals(name))
+            return allApps && original instanceof String ? "" : original;
         if ("writing_tools_v2_backend_type".equals(name))
             return original instanceof Long ? Long.valueOf(1L) : original;
         if (LANGUAGE_FLAGS.contains(name))

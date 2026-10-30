@@ -5,7 +5,7 @@ import static org.junit.Assert.*;
 
 public final class WritingToolsFlagPolicyTest {
     private static final String[] BASIC = {
-        "config_proofread", "writing_tools", "writing_tools_enable_stable_entrance", "enable_writing_tools_cooperative_mode",
+        "config_proofread", "writing_tools", "enable_writing_tools_replace_button", "writing_tools_enable_stable_entrance", "enable_writing_tools_cooperative_mode",
         "writing_helper_on_selected_text", "writing_helper_enable_text_stylization_internal",
         "writing_helper", "enable_nga_lab_modeless_smartedit", "enable_writing_tools_voice_commands"
     };
@@ -31,6 +31,13 @@ public final class WritingToolsFlagPolicyTest {
         for (String flag : OFF) assertEquals(flag, Boolean.FALSE, apply(flag, Boolean.TRUE));
         assertEquals(Long.valueOf(1), apply("writing_tools_v2_backend_type", Long.valueOf(3)));
         for (String flag : LANGUAGES) assertEquals("*", apply(flag, "en-US"));
+    }
+    @Test public void appFilterNeedsBothExplicitOptInAndWritingTools() {
+        String original = "exclude:com.example.app";
+        assertEquals(original, WritingToolsFlagPolicy.overrideValue("proofread_supported_apps", original, true, false));
+        assertEquals(original, WritingToolsFlagPolicy.overrideValue("proofread_supported_apps", original, false, true));
+        assertEquals("", WritingToolsFlagPolicy.overrideValue("proofread_supported_apps", original, true, true));
+        assertEquals(false, WritingToolsFlagPolicy.overrideValue("proofread_supported_apps", false, true, true));
     }
     @Test public void regexFallbackPreservesExistingConfiguration() {
         assertEquals("v3", apply("nga_lab_modeless_smartedit_regex_version", ""));

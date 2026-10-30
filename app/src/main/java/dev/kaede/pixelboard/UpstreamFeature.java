@@ -42,6 +42,19 @@ public enum UpstreamFeature {
             "enable_incognito_mode_entry_point", "allow_incognito_mode_switch"),
     EMOGEN("emogen", "AI 表情生成入口", "仅开放原生入口；服务、地区与账号支持仍由 Gboard 决定",
             "enable_emogen", "emogen_entry_point", "emogen_feature_enabled", "emogen_in_access_points"),
+    GOOGLE_SANS("google_sans", "Google Sans 字体", "启用 Gboard 原生 Google Sans Flex 与表现力主题；需宿主字体和系统支持",
+            "google_sans_flex", "platform_google_sans_flex", "gm3_expressive"),
+    UNDO("undo_button", "撤销按钮", "启用候选栏撤销与语音删除撤销；关闭后遵循 Gboard 原设置",
+            "undo_proactive_post_correction", "undo_proactive_auto_correction_cooperative",
+            "undo_enable_chunk_fusion", "nga_enable_undo_delete"),
+    QUICK_EMOJI("quick_emoji", "快捷表情栏", "启用 Gboard 原生快捷表情栏；实际显示取决于输入场景",
+            "enable_fast_access_bar"),
+    MAGIC_EMOJI("magic_emoji", "Magic Emoji 表情转换", "开放原生文字转表情入口；语言及资源支持由 Gboard 决定",
+            "enable_emojify", "enable_emojify_settings_option",
+            "enable_emojify_shortcut_when_followed_by_emoji", "enable_emojify_when_talkback_on"),
+    PROOFREAD_CHIPS("proofread_chips", "校对与纠错按钮", "启用原生校对候选按钮；需 Gboard 校对能力可用",
+            "enable_spellchecker_chips_ui", "enable_spellchecker_chips_ui_web_view"),
+    WRITING_ALL_APPS("writing_all_apps", "扩展校对应用范围", "清除 Gboard 的校对应用过滤配置；需同时开启 AI 写作工具，应用仍需兼容输入法"),
     OPAQUE_EMOJI("opaque_emoji", "候选表情完整色彩", "绘制候选表情时恢复不透明色彩；普通文字保持原样");
 
     public final String key, title, summary;
@@ -55,6 +68,17 @@ public enum UpstreamFeature {
     }
 
     static {
+        UNDO.overrides.put("undo_stop_deferred_range_notification", false);
+        UNDO.overrides.put("undo_stop_pk_handling", false);
+        UNDO.overrides.put("undo_promotion_banner_threshold", 1L);
+        UNDO.overrides.put("undo_max_chunk", 100L);
+        UNDO.overrides.put("undo_truncate_suffix_len", 64L);
+        UNDO.overrides.put("undo_suppress_app_pattern", "");
+        QUICK_EMOJI.overrides.put("fast_access_bar_app_whitelist", "*");
+        MAGIC_EMOJI.overrides.put("enable_emojify_language_tags", "*");
+        MAGIC_EMOJI.overrides.put("emojify_app_allowlist", "*");
+        MAGIC_EMOJI.overrides.put("emojify_enabled_patterns_in_order", "1,2,3");
+        MAGIC_EMOJI.overrides.put("enable_emojify_model", false);
         AUTO_CORRECTION.overrides.put("delay_to_wait_for_suggestions_before_commit_ms", 150L);
         SMART_COMPOSE.overrides.put("smart_compose_status", 1L);
         // Use the actual upstream runtime values, rather than README's older threshold of 1.

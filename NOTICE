@@ -4,7 +4,7 @@ Copyright (C) 2026 Kaede and contributors.
 This is an independent LSPosed API 102 runtime adaptation of:
   PixelBoard — Akshay Kadam / Akshayykadam and contributors
   https://github.com/Akshayykadam/PixelBoard
-  Upstream reviewed revision: 8d1d53d58f98abb76adac31facd2408261f732bb
+  Upstream reviewed revision: 7e025660c974f3088549b55364b909a9b2b836c9
 
 Upstream declares GNU GPL version 3. See LICENSE for the full license text.
 This project's module source is distributed under GPL-3.0-only.

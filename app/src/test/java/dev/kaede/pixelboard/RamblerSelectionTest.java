@@ -50,4 +50,24 @@ public final class RamblerSelectionTest {
         assertTrue(RamblerSelection.mayExpose(context));
         assertFalse(RamblerSelection.mayExpose(null));
     }
+
+    @Test public void nativeMinimizeRouteHonorsFeatureSelectionScopesAndTypes() {
+        SharedPreferences config = context.getSharedPreferences("minimize_test", 0);
+        config.edit().clear().putBoolean("rambler", true).commit();
+        FeatureConfig.reload(config); FeatureConfig.compatibility(true, true);
+        preferences.edit().putBoolean("enable_jetson", true).commit();
+        String flag = "enable_rambler_al_toolbar";
+        assertTrue(RamblerFlagPolicy.targeted(flag));
+        assertEquals(false, RamblerFlagPolicy.transform(flag, true, context));
+        assertEquals(1L, RamblerFlagPolicy.transform(flag, 1L, context));
+        assertEquals(true, RamblerFlagPolicy.transform(flag, true, null));
+        preferences.edit().putBoolean("enable_jetson", false).commit();
+        assertEquals(true, RamblerFlagPolicy.transform(flag, true, context));
+        preferences.edit().putBoolean("enable_jetson", true).commit();
+        RamblerScope.enterDefault();
+        try { assertEquals(true, RamblerFlagPolicy.transform(flag, true, context)); }
+        finally { RamblerScope.exitDefault(); }
+        config.edit().clear().commit(); FeatureConfig.reload(config);
+        assertEquals(true, RamblerFlagPolicy.transform(flag, true, context));
+    }
 }

@@ -16,7 +16,6 @@ public final class RamblerFlagPolicy {
             "enable_jetson_in_toolbar",
             "filter_rambler_contributed_input_view_session",
             "enable_rambler_toolbar_at_cursor_position",
-            "enable_rambler_al_toolbar",
             "enable_rambler_al_toolbar_overflow_menu",
             "enable_hide_rambler_al_idling_state",
             "enable_rambler_al_show_hide_new_animation",
@@ -33,6 +32,7 @@ public final class RamblerFlagPolicy {
     );
     public static boolean targeted(String name) {
         return BOOLEAN_FLAGS.contains(name)
+                || "enable_rambler_al_toolbar".equals(name)
                 || "show_rambler_dict_settings".equals(name)
                 || "ad_activation_type".equals(name);
     }
@@ -40,6 +40,9 @@ public final class RamblerFlagPolicy {
         if (!FeatureConfig.rambler() || name == null || context == null) return original;
         // Respect explicit opt-out across all flags, including activation type and settings.
         if (!RamblerSelection.mayExpose(context)) return original;
+        // Upstream 1.3.3 restores Gboard's native collapse/floating voice toolbar route.
+        if ("enable_rambler_al_toolbar".equals(name))
+            return original instanceof Boolean ? Boolean.FALSE : original;
         if ("show_rambler_dict_settings".equals(name))
             return original instanceof Boolean ? Boolean.TRUE : original;
         if ("ad_activation_type".equals(name))
