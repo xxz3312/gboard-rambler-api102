@@ -41,6 +41,9 @@ public final class SettingsActivity extends AppCompatActivity {
     private MaterialSwitch launcherSwitch;
     private boolean refreshingLauncher;
     private LinearLayout root;
+    private LinearLayout upstreamGroup;
+    private NativeSettingsCatalog.Result shownNativeSettings=NativeSettingsCatalog.EMPTY;
+    private View retentionControl;
     private MaterialTextView frameworkSummary, compatibilityTitle, compatibilitySummary, retentionSummary;
     private View restartAction, exportAction, updateAction;
     private boolean exportRootLogs, exportPending, exportRunning, updateRunning;
@@ -61,6 +64,7 @@ public final class SettingsActivity extends AppCompatActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        refreshNativeControls();
         if (launcherSwitch != null) refreshLauncher();
         statusHandler.removeCallbacks(statusTicker);
         statusHandler.post(statusTicker);
@@ -127,13 +131,8 @@ public final class SettingsActivity extends AppCompatActivity {
         list.addView(hint);
 
         section(list, "输入与表情");
-        LinearLayout upstream = group(list);
-        boolean firstUpstream = true;
-        for (UpstreamFeature feature : UpstreamFeature.values()) {
-            if (!firstUpstream) divider(upstream);
-            firstUpstream = false;
-            toggle(upstream, feature.key, feature.title, feature.summary, R.drawable.ic_edit, false);
-        }
+        upstreamGroup = group(list);
+        renderUpstream(NativeSettingsCatalog.detect(this));
         MaterialTextView upstreamHint = label("这些开关启用 Gboard 已有能力，实际入口与效果取决于当前版本和语言。同步后重新打开键盘；若界面未刷新，请重启 Gboard。",
                 com.google.android.material.R.style.TextAppearance_Material3_BodySmall,
                 com.google.android.material.R.attr.colorOnSurfaceVariant);
@@ -167,6 +166,8 @@ public final class SettingsActivity extends AppCompatActivity {
         });
 
         retentionSummary=retentionRow.summary;
+        retentionControl=retentionRow.view;
+        retentionControl.setVisibility(shownNativeSettings.retention?View.GONE:View.VISIBLE);
         section(list, "外观");
         LinearLayout appearance = group(list);
         toggle(appearance, "rounded_keys", "Material 3 表现力圆角键", "启用 Belka UI 胶囊形按键", R.drawable.ic_edit, false);
@@ -421,6 +422,27 @@ public final class SettingsActivity extends AppCompatActivity {
         });
         return toggle;
     }
+    void renderUpstream(NativeSettingsCatalog.Result catalog) {
+        shownNativeSettings=catalog;
+        upstreamGroup.removeAllViews();
+        boolean first=true;
+        for(UpstreamFeature feature:UpstreamFeature.values()) {
+            if(catalog.owns(feature)) continue;
+            if(!first) divider(upstreamGroup);
+            first=false;
+            toggle(upstreamGroup,feature.key,feature.title,feature.summary,R.drawable.ic_edit,false);
+        }
+    }
+    private void refreshNativeControls() {
+        if(upstreamGroup==null) return;
+        NativeSettingsCatalog.Result latest=NativeSettingsCatalog.detect(this);
+        if(!latest.fingerprint.equals(shownNativeSettings.fingerprint)) {
+            renderUpstream(latest);
+            if(retentionControl!=null) retentionControl.setVisibility(latest.retention?View.GONE:View.VISIBLE);
+            ((ModuleApp)getApplication()).sync();
+        }
+    }
+
     private static final class Row {
         final LinearLayout view;
         final MaterialTextView title, summary;

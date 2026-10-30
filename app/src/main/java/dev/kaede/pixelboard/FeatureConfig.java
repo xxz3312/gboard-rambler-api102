@@ -9,6 +9,9 @@ import java.util.*;
 public final class FeatureConfig {
     private static final String TAG = "PixelBoardLS";
     public static final String GROUP = "features";
+    private static volatile NativeSettingsCatalog.Result nativeSettings=NativeSettingsCatalog.EMPTY;
+    static void nativeSettings(NativeSettingsCatalog.Result result) { nativeSettings=result; }
+    static boolean nativePreference(String key) { return nativeSettings.nativeKeys.contains(key); }
     private static volatile Snapshot state = new Snapshot(Collections.emptyMap());
     private static SharedPreferences remote;
     // SharedPreferences retains listeners weakly; keep this listener alive for the host process.
@@ -51,14 +54,14 @@ public final class FeatureConfig {
         }
         catch (RuntimeException error) { Log.w(TAG, "Cannot reload settings; keeping last snapshot", error); }
     }
-    public static boolean enabled(UpstreamFeature feature) { return state.has(feature.key); }
+    public static boolean enabled(UpstreamFeature feature) { return state.has(feature.key) && !nativeSettings.owns(feature); }
     public static String upstreamSummary() {
         Set<UpstreamFeature> selected = EnumSet.noneOf(UpstreamFeature.class);
         for (UpstreamFeature feature : UpstreamFeature.values()) if (enabled(feature)) selected.add(feature);
         return selected.toString();
     }
     public static boolean clipboardSync() { return state.has("clipboard_focus_sync"); }
-    public static String retention() { return state.retention; }
+    public static String retention() { return nativeSettings.retention ? "stock" : state.retention; }
     public static boolean scanText() { return state.has("scan_text"); }
     public static boolean screenshot() { return state.has("screenshot_suggestions"); }
     public static boolean roundedKeys() { return state.has("rounded_keys"); }
@@ -66,7 +69,7 @@ public final class FeatureConfig {
         Snapshot current = state;
         if (current.has("scan_text") || current.has("screenshot_suggestions") || current.has("rounded_keys")) return true;
         for (UpstreamFeature feature : UpstreamFeature.values())
-            if (feature.usesFlags() && current.has(feature.key)) return true;
+            if (feature.usesFlags() && enabled(feature)) return true;
         return false;
     }
     public static boolean ramblerRequested() { return state.has("rambler"); }

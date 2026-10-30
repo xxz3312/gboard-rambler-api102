@@ -86,3 +86,5 @@ Release 构建启用 R8 和资源裁剪。
 GPL-3.0。DexKit 等依赖的许可和来源说明随 APK 附带，见 `assets/licenses` 和仓库中的 [第三方声明](THIRD_PARTY_NOTICES.md)。仓库及发布附件不包含 Gboard、AICore、PCS 安装包或 Google 模型权重。
 
 Google、Gboard、Pixel 等商标属于其权利人。本项目与 Google、上游作者及框架无隶属或背书关系。
+
+模块优先采用 Gboard 原生同功能控件：检测到对应控件时隐藏重复选项并停止相关覆盖；无法确认时保留。详见 [原生设置优先](docs/NATIVE_SETTINGS_OWNERSHIP.md)。

@@ -7,7 +7,7 @@ import android.os.Process;
 
 /** Metadata only. Receiving app authenticates the sender through Android 14+ identity. */
 public final class CloudRuntimeStatus extends BroadcastReceiver {
-    public static final String VERSION="0.2.4";
+    public static final String VERSION="0.2.5";
     private static final String PREF="cloud_runtime_status";
     public static void send(Context context,String event,String detail) {
         if(context==null||Build.VERSION.SDK_INT<34)return;
@@ -27,7 +27,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
             int uid=context.getPackageManager().getPackageUid("com.google.android.inputmethod.latin",0);
             if(uid!=getSentFromUid()||!VERSION.equals(intent.getStringExtra("version")))return;
             String event=intent.getStringExtra("event");
-            if(!"COMPAT".equals(event)&&!"INIT".equals(event)&&!"GETTER".equals(event)&&!"FLAG".equals(event)&&!"HOOKS".equals(event)&&!"ERROR".equals(event)&&!"EXTRAS".equals(event)&&!"EXTRA_FLAG".equals(event)&&!"UPSTREAM".equals(event)&&!"RUNTIME_HOOKS".equals(event)&&!"CLIPBOARD_SYNC".equals(event)&&!"CONFIG_APPLIED".equals(event)&&!"NATIVE_PREF".equals(event)&&!"RAMBLER_UI".equals(event)&&!"RAMBLER_UI_EVENT".equals(event)&&!"RAMBLER_SELECTION".equals(event)&&!"RAMBLER_FLAG".equals(event)&&!"RETENTION_READ".equals(event))return;
+            if(!"COMPAT".equals(event)&&!"INIT".equals(event)&&!"GETTER".equals(event)&&!"FLAG".equals(event)&&!"HOOKS".equals(event)&&!"ERROR".equals(event)&&!"EXTRAS".equals(event)&&!"EXTRA_FLAG".equals(event)&&!"UPSTREAM".equals(event)&&!"RUNTIME_HOOKS".equals(event)&&!"CLIPBOARD_SYNC".equals(event)&&!"CONFIG_APPLIED".equals(event)&&!"NATIVE_SETTINGS".equals(event)&&!"NATIVE_PREF".equals(event)&&!"RAMBLER_UI".equals(event)&&!"RAMBLER_UI_EVENT".equals(event)&&!"RAMBLER_SELECTION".equals(event)&&!"RAMBLER_FLAG".equals(event)&&!"RETENTION_READ".equals(event))return;
             String detail=intent.getStringExtra("detail");
             if(detail==null||detail.length()>480)return;
             android.content.SharedPreferences prefs=context.getSharedPreferences(PREF,0);
@@ -76,7 +76,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
         else if(!capability.contains("false"))out.append("Hook 安装检查完成；云端功能仍需实际操作验证。\n");
         if(p.getString("RAMBLER_UI", "").startsWith("skipped:")) out.append("Rambler 按钮增强未安装，当前保留原生布局；详情见 RAMBLER_UI。\n");
         out.append("Gboard PID=").append(p.getInt("pid",-1)).append("\n");
-        for(String event:new String[]{"COMPAT","INIT","GETTER","HOOKS","ERROR","FLAG","EXTRAS","EXTRA_FLAG","UPSTREAM","RUNTIME_HOOKS","CLIPBOARD_SYNC","CONFIG_APPLIED","NATIVE_PREF","RAMBLER_SELECTION","RAMBLER_FLAG","RAMBLER_UI","RAMBLER_UI_EVENT","RETENTION_READ"}) {
+        for(String event:new String[]{"COMPAT","INIT","GETTER","HOOKS","ERROR","FLAG","EXTRAS","EXTRA_FLAG","UPSTREAM","RUNTIME_HOOKS","CLIPBOARD_SYNC","CONFIG_APPLIED","NATIVE_SETTINGS","NATIVE_PREF","RAMBLER_SELECTION","RAMBLER_FLAG","RAMBLER_UI","RAMBLER_UI_EVENT","RETENTION_READ"}) {
             String detail=p.getString(event,"");
             if(!detail.isEmpty()) {
                 long time=p.getLong(event+"_when",0);

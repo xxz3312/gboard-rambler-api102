@@ -11,6 +11,24 @@ import static org.junit.Assert.*;
 public final class SettingsActivityLaunchTest {
     @Test public void launchesWithoutFrameworkInLightTheme() { launch(false); }
     @Test public void launchesWithoutFrameworkInDarkTheme() { launch(true); }
+    @Test public void equivalentNativeControlsAreAbsentWhileEnhancementsRemainVisible() {
+        try(ActivityController<SettingsActivity> controller=Robolectric.buildActivity(SettingsActivity.class)) {
+            SettingsActivity activity=controller.setup().visible().get();
+            activity.renderUpstream(new NativeSettingsCatalog.Result("native",java.util.Map.of(
+                    "enable_fast_access_bar","SwitchPreferenceCompat",
+                    "enable_emojify","SwitchPreferenceCompat",
+                    "keyboard_emoji_scale_setting","custom.EmojiScaleSliderPreference"),java.util.Set.of()));
+            android.view.View root=activity.findViewById(android.R.id.content);
+            assertNull(findSwitch(root,UpstreamFeature.QUICK_EMOJI.title));
+            assertNull(findSwitch(root,UpstreamFeature.MAGIC_EMOJI.title));
+            assertNull(findSwitch(root,UpstreamFeature.EMOJI_SIZE.title));
+            assertNotNull(findSwitch(root,UpstreamFeature.UNDO.title));
+            assertNotNull(findSwitch(root,UpstreamFeature.GOOGLE_SANS.title));
+            assertNotNull(findSwitch(root,UpstreamFeature.EMOJI_SUGGESTIONS.title));
+            activity.renderUpstream(NativeSettingsCatalog.EMPTY);
+            assertNotNull(findSwitch(root,UpstreamFeature.QUICK_EMOJI.title));
+        }
+    }
     @Test public void exportOffersNonRootSaveThroughSystemPicker() {
         try(ActivityController<SettingsActivity> controller=Robolectric.buildActivity(SettingsActivity.class)) {
             SettingsActivity activity=controller.setup().visible().get();

@@ -61,6 +61,8 @@ public final class PixelBoardModule extends XposedModule {
 
     private void initializeForGboard(ClassLoader loader, Context context) {
         hostContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        NativeSettingsCatalog.Result nativeSettings=NativeSettingsCatalog.detect(context);
+        FeatureConfig.nativeSettings(nativeSettings);
         FeatureConfig.initialize(this);
         FeatureConfig.onChange(() -> CloudRuntimeStatus.send(hostContext,"CONFIG_APPLIED",
                 "runtimePolicy=updated; host cached UI/models may need restart"));
@@ -84,6 +86,7 @@ public final class PixelBoardModule extends XposedModule {
         Log.i(TAG,"Compatibility rambler="+voiceCompatible+" writing="+writingCompatible
                 +" resolver="+resolved.source);
         reportRamblerSelection();
+        CloudRuntimeStatus.send(hostContext,"NATIVE_SETTINGS","native controls="+nativeSettings.owned+" retention="+nativeSettings.retention);
         boolean voiceInstalled=voiceCompatible && installRambler(loader,resolved.voice);
         boolean getterInstalled=false;
         if (resolved.flags!=null)

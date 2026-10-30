@@ -6,8 +6,8 @@ android {
         applicationId = "dev.kaede.pixelboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 42
-        versionName = "0.2.4"
+        versionCode = 43
+        versionName = "0.2.5"
     }
     buildTypes {
         release {

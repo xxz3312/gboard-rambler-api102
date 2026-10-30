@@ -28,6 +28,7 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
     }
 
     public String configurationStatus() {
+        NativeSettingsCatalog.Result catalog=NativeSettingsCatalog.detect(this);
         SharedPreferences local = getSharedPreferences("features", MODE_PRIVATE);
         return "保存配置：Rambler=" + local.getBoolean("rambler", false)
                 + " 写作工具=" + local.getBoolean("writing_tools", false)
@@ -36,14 +37,15 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
                 + " 圆角键=" + local.getBoolean("rounded_keys", false)
                 + "\n输入时同步剪贴板=" + local.getBoolean("clipboard_focus_sync",false)
                 + upstreamConfiguration(local)
-                + "\n剪贴板保留=" + ClipboardRetention.LABELS[ClipboardRetention.index(ClipboardRetention.sanitize(local.getString(ClipboardRetention.KEY, "stock")))]
+                + "\n剪贴板保留=" + ClipboardRetention.LABELS[ClipboardRetention.index(catalog.retention?"stock":ClipboardRetention.sanitize(local.getString(ClipboardRetention.KEY, "stock")))]
                 + "\n服务连接：" + connected() + "\n" + lastSync;
     }
 
-    private static String upstreamConfiguration(SharedPreferences prefs) {
+    private String upstreamConfiguration(SharedPreferences prefs) {
+        NativeSettingsCatalog.Result catalog=NativeSettingsCatalog.detect(this);
         StringBuilder summary = new StringBuilder();
         for (UpstreamFeature feature : UpstreamFeature.values())
-            summary.append("\n").append(feature.title).append("=").append(prefs.getBoolean(feature.key, false));
+            summary.append("\n").append(feature.title).append("=").append(catalog.owns(feature)?"遵循 Gboard 原生设置":prefs.getBoolean(feature.key, false));
         return summary.toString();
     }
 
@@ -51,11 +53,12 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
         XposedService current = service;
         if (current == null) { lastSync = "LSPosed 服务未连接：开关仅保存在本地，尚未同步。"; Log.w(TAG, lastSync); return; }
         try {
+            NativeSettingsCatalog.Result catalog=NativeSettingsCatalog.detect(this);
             SharedPreferences local = getSharedPreferences(FeatureConfig.GROUP, MODE_PRIVATE);
             SharedPreferences remote = current.getRemotePreferences(FeatureConfig.GROUP);
             SharedPreferences.Editor editor = remote.edit()
                     .putBoolean("clipboard_focus_sync",local.getBoolean("clipboard_focus_sync",false))
-                    .putString(ClipboardRetention.KEY, ClipboardRetention.sanitize(local.getString(ClipboardRetention.KEY, "stock")))
+                    .putString(ClipboardRetention.KEY, catalog.retention?"stock":ClipboardRetention.sanitize(local.getString(ClipboardRetention.KEY, "stock")))
                     .putBoolean("rambler", local.getBoolean("rambler", false))
                     .remove("spellchecker")
                     .putBoolean("diagnostics", local.getBoolean("diagnostics", false))
@@ -64,7 +67,7 @@ public final class ModuleApp extends Application implements XposedServiceHelper.
                     .putBoolean("screenshot_suggestions", local.getBoolean("screenshot_suggestions", false))
                     .putBoolean("rounded_keys", local.getBoolean("rounded_keys", false));
             for (UpstreamFeature feature : UpstreamFeature.values())
-                editor.putBoolean(feature.key, local.getBoolean(feature.key, false));
+                editor.putBoolean(feature.key, !catalog.owns(feature) && local.getBoolean(feature.key, false));
             boolean success = editor.commit();
             lastSync = success ? "最近一次同步成功（不代表 Hook 已加载）。" : "配置同步失败。";
             Log.i(TAG, "Remote preferences sync=" + success);
