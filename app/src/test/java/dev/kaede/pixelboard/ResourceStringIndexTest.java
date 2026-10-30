@@ -19,7 +19,7 @@ public final class ResourceStringIndexTest {
         int p=12;
         b.position(p); b.putShort((short)1).putShort((short)28).putInt(poolSize).putInt(1).putInt(0)
                 .putInt(utf8?256:0).putInt(32).putInt(0).putInt(0);
-        if(utf8) b.put((byte)label.length()).put((byte)text.length()); else b.putShort((short)label.length());
+        if(utf8) b.put((byte)label.length()).put((byte)text.length); else b.putShort((short)label.length());
         b.put(text);
         p+=poolSize;
         b.position(p); b.putShort((short)0x200).putShort((short)288).putInt(pkgSize).putInt(127);
