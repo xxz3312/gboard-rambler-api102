@@ -2,7 +2,7 @@ name: APK verification
 on:
   workflow_dispatch:
   push:
-    branches: [writing-tools-upstream-port, port-ocr-screenshot-belka, port-more-upstream-features, universal-upstream-hooks, fix-clipboard-retention, fix-rambler-selector, sync-upstream-1.3.3, port-rambler-controls, hide-native-settings]
+    branches: [writing-tools-upstream-port, port-ocr-screenshot-belka, port-more-upstream-features, universal-upstream-hooks, fix-clipboard-retention, fix-rambler-selector, sync-upstream-1.3.3, port-rambler-controls, hide-native-settings, add-launcher-icon]
 jobs:
   release:
     runs-on: ubuntu-latest
