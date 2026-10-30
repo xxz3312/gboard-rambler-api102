@@ -32,6 +32,7 @@ public final class KeyboardFeaturePolicy {
         return original;
     }
     public static Object transform(String name, Object original) {
+        if ("enable_screenshot_in_clipboard".equals(name) && FeatureConfig.nativePreference(name)) return original;
         if ("enable_extended_clipboard_history".equals(name) && original instanceof Boolean
                 && !"stock".equals(FeatureConfig.retention())) return Boolean.TRUE;
         return UpstreamFeature.transform(name, overrideValue(name, original, FeatureConfig.scanText(),
