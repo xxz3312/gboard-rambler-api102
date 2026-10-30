@@ -149,7 +149,10 @@ public final class PixelBoardModule extends XposedModule {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 if (defaults) RamblerScope.enterDefault(); else RamblerScope.enterVoice();
-                try { return chain.proceed(); }
+                try {
+                    reportRamblerSelection();
+                    return chain.proceed();
+                }
                 finally {
                     if (defaults) RamblerScope.exitDefault(); else RamblerScope.exitVoice();
                 }
@@ -252,9 +255,13 @@ public final class PixelBoardModule extends XposedModule {
 
     private void reportRamblerSelection() {
         if (!FeatureConfig.diagnostics()) return;
-        String detail = RamblerSelection.diagnostic(hostContext);
-        if (ramblerDiagnostics.add("selection:" + detail))
-            CloudRuntimeStatus.send(hostContext, "RAMBLER_SELECTION", detail);
+        try {
+            String detail = RamblerSelection.diagnostic(hostContext);
+            if (ramblerDiagnostics.add("selection:" + detail))
+                CloudRuntimeStatus.send(hostContext, "RAMBLER_SELECTION", detail);
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Rambler selection diagnostic unavailable", error);
+        }
     }
 
     /** Exact 18.4 mapping. Read signals after stock callbacks; never alter eligibility. */
