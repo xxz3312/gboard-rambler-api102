@@ -18,6 +18,7 @@ public final class PixelBoardModule extends XposedModule {
 
     private final AtomicBoolean bootstrapped = new AtomicBoolean(false);
     private final java.util.Set<String> writingFlagsLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<String> ramblerDiagnostics = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicInteger writingToolbarReadCount = new AtomicInteger(0);
     private volatile boolean verifiedWritingTools184;
     private volatile Context hostContext;
@@ -82,6 +83,7 @@ public final class PixelBoardModule extends XposedModule {
                 +" writingTools="+FeatureConfig.writingTools()+" version="+gboardVersion(context));
         Log.i(TAG,"Compatibility rambler="+voiceCompatible+" writing="+writingCompatible
                 +" resolver="+resolved.source);
+        reportRamblerSelection();
         boolean voiceInstalled=voiceCompatible && installRambler(loader,resolved.voice);
         boolean getterInstalled=false;
         if (resolved.flags!=null)
@@ -163,7 +165,10 @@ public final class PixelBoardModule extends XposedModule {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
-                if (result instanceof Boolean) RamblerSelection.observe((Boolean) result, hostContext);
+                if (result instanceof Boolean) {
+                    RamblerSelection.observe((Boolean) result, hostContext);
+                    reportRamblerSelection();
+                }
                 return result;
             });
             return true;
@@ -177,6 +182,7 @@ public final class PixelBoardModule extends XposedModule {
         try {
             hook(target.resolve(loader)).intercept(chain -> {
                 Object result = chain.proceed();
+                reportRamblerSelection();
                 if (FeatureConfig.diagnostics()) Log.d(TAG, "Official selector write completed (no forced selection)");
                 return result;
             });
@@ -215,8 +221,16 @@ public final class PixelBoardModule extends XposedModule {
                                 + " type=" + (original == null ? "null" : original.getClass().getSimpleName())
                                 + " changed=" + !java.util.Objects.equals(original, writingResult));
                     }
-                    Object result = KeyboardFeaturePolicy.transform(flag,
-                            RamblerFlagPolicy.transform(flag, writingResult, context));
+                    Object ramblerResult = RamblerFlagPolicy.transform(flag, writingResult, context);
+                    if (FeatureConfig.diagnostics() && FeatureConfig.ramblerRequested()
+                            && RamblerFlagPolicy.targeted(flag)) {
+                        String detail = flag + " type=" + (original == null ? "null" : original.getClass().getSimpleName())
+                                + " changed=" + !java.util.Objects.equals(writingResult, ramblerResult)
+                                + " " + RamblerSelection.diagnostic(context);
+                        if (ramblerDiagnostics.add("flag:" + detail))
+                            CloudRuntimeStatus.send(context, "RAMBLER_FLAG", detail);
+                    }
+                    Object result = KeyboardFeaturePolicy.transform(flag, ramblerResult);
                     if (KeyboardFeaturePolicy.targeted(flag) && FeatureConfig.diagnostics()
                             && writingFlagsLogged.add("extra:"+flag))
                         CloudRuntimeStatus.send(context,"EXTRA_FLAG",flag+" changed="+!java.util.Objects.equals(original,result));
@@ -234,6 +248,13 @@ public final class PixelBoardModule extends XposedModule {
             Log.w(TAG, "Flag getter hook skipped", e);
             return false;
         }
+    }
+
+    private void reportRamblerSelection() {
+        if (!FeatureConfig.diagnostics()) return;
+        String detail = RamblerSelection.diagnostic(hostContext);
+        if (ramblerDiagnostics.add("selection:" + detail))
+            CloudRuntimeStatus.send(hostContext, "RAMBLER_SELECTION", detail);
     }
 
     /** Exact 18.4 mapping. Read signals after stock callbacks; never alter eligibility. */
