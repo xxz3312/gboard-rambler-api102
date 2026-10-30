@@ -14,7 +14,6 @@ final class NativeKeyboardPreferences {
     NativeKeyboardPreferences(Context context) {
         add(context);
         add(context.createDeviceProtectedStorageContext());
-        add(context.createCredentialProtectedStorageContext());
     }
 
     private void add(Context context) {
