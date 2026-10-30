@@ -68,7 +68,8 @@ final class ResourceStringIndex {
             int size = Math.multiplyExact(length, utf8 ? 1 : 2);
             if (size > stop - at[0]) throw new IllegalArgumentException("ARSC string length");
             byte[] text = new byte[size];
-            data.duplicate().position(at[0]).get(text);
+            ByteBuffer source=data.duplicate();
+            source.position(at[0]); source.get(text);
             values.add(new String(text, utf8 ? StandardCharsets.UTF_8 : StandardCharsets.UTF_16LE));
         }
         return values;

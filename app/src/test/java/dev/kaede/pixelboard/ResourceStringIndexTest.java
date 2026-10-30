@@ -44,4 +44,12 @@ public final class ResourceStringIndexTest {
         ByteBuffer.wrap(valid).order(ByteOrder.LITTLE_ENDIAN).putInt(4,Integer.MAX_VALUE);
         assertThrows(IllegalArgumentException.class,()->ResourceStringIndex.find(valid,Set.of("x")));
     }
+    @Test public void sixteenBitOffsetsResolveTheSameNativeLabels() {
+        byte[] bytes=table(true,false);
+        ByteBuffer b=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        int type=12+b.getInt(16)+288;
+        b.put(type+9,(byte)2);
+        b.putShort(type+20,(short)0); b.putShort(type+22,(short)4);
+        assertEquals(Set.of(0x7f140000,0x7f140001),ResourceStringIndex.find(bytes,Set.of("Minimize keyboard")).get("Minimize keyboard"));
+    }
 }
