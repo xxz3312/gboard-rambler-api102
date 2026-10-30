@@ -22,10 +22,19 @@ public final class RamblerSelection {
     public static boolean mayExpose(Context context) {
         if (RamblerScope.isDefaultSelection()) return false;
         if (context == null) return false; // never widen policy without host context
-        Boolean pref = readPreference(context);
-        if (Boolean.FALSE.equals(pref)) return false;
+        // Keep the official selector discoverable even after an explicit opt-out.
+        // This exposes settings only; runtime activation still respects the preference.
         if (RamblerScope.isVoiceSettings()) return true;
+        Boolean pref = readPreference(context);
+        if (pref != null) return pref;
         return !Boolean.FALSE.equals(observedSelection);
+    }
+
+    static String diagnostic(Context context) {
+        return "nativeSelected=" + readPreference(context) + " observedSelected=" + observedSelection
+                + " voiceSettings=" + RamblerScope.isVoiceSettings()
+                + " defaultSelection=" + RamblerScope.isDefaultSelection()
+                + " policyAllowed=" + mayExpose(context);
     }
 
     public static boolean explicitlyDisabled(Context context) {
