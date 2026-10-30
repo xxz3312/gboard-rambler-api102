@@ -96,12 +96,12 @@ public final class PixelBoardModule extends XposedModule {
                 +" getterInstalled="+getterInstalled
                 +" extrasRequested="+FeatureConfig.extrasRequested()
                 +" extrasInstalled="+(FeatureConfig.extrasRequested() && getterInstalled));
-        boolean roundedPreference = installRoundedPreference(loader);
+        boolean roundedPreference = installNativePreferences(loader);
         RuntimeFeatureHooks.install(this, hostContext, loader);
         CloudRuntimeStatus.send(hostContext,"EXTRAS",
                 "scanText="+FeatureConfig.scanText()+" screenshot="+FeatureConfig.screenshot()
                 +" roundedKeys="+FeatureConfig.roundedKeys()+" getter="+getterInstalled
-                +" roundedPreference="+roundedPreference+"; "+HostFeaturePermissions.summary(hostContext));
+                +" roundedPreference="+roundedPreference+" nativePreferences="+roundedPreference+"; "+HostFeaturePermissions.summary(hostContext));
         CloudRuntimeStatus.send(hostContext,"UPSTREAM",
                 "requested="+FeatureConfig.upstreamSummary()+" getter="+getterInstalled);
         FeatureConfig.compatibility(
@@ -113,18 +113,24 @@ public final class PixelBoardModule extends XposedModule {
             Log.i(TAG,"Writing Tools basic cloud; V2=false; backend=GBOARD_SERVER; local=false");
         }
     }
-    private boolean installRoundedPreference(ClassLoader loader) {
+    private boolean installNativePreferences(ClassLoader loader) {
         try {
+            NativeKeyboardPreferences preferences = new NativeKeyboardPreferences(hostContext);
             Method getter = Class.forName("android.app.SharedPreferencesImpl", false, loader)
                     .getDeclaredMethod("getBoolean", String.class, boolean.class);
             hook(getter).intercept(chain -> {
-                if (FeatureConfig.roundedKeys() && "enable_rounded_keys".equals(chain.getArgs().get(0)))
-                    return Boolean.TRUE;
-                return chain.proceed();
+                Object original = chain.proceed();
+                String key = (String) chain.getArgs().get(0);
+                if (!(original instanceof Boolean)) return original;
+                boolean result = preferences.override(chain.getThisObject(), key, (Boolean) original);
+                if (FeatureConfig.diagnostics() && !original.equals(result)
+                        && writingFlagsLogged.add("native-pref:" + key))
+                    CloudRuntimeStatus.send(hostContext, "NATIVE_PREF", key + " changed=true");
+                return result;
             });
             return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
-            Log.w(TAG,"Rounded preference hook could not be installed",error);
+            Log.w(TAG,"Native preference hook could not be installed",error);
             return false;
         }
     }

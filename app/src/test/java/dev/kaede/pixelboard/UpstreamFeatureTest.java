@@ -41,6 +41,26 @@ public final class UpstreamFeatureTest {
         assertFalse(UpstreamFeature.targeted(null));
     }
 
+    @Test public void new133GroupsRespectTypesAndRestoreNativeValuesWhenDisabled() {
+        assertEquals(true, value("google_sans_flex", false, UpstreamFeature.GOOGLE_SANS));
+        assertEquals(false, value("undo_stop_pk_handling", true, UpstreamFeature.UNDO));
+        assertEquals(100L, value("undo_max_chunk", 3L, UpstreamFeature.UNDO));
+        assertEquals(3, value("undo_max_chunk", 3, UpstreamFeature.UNDO));
+        assertEquals("", value("undo_suppress_app_pattern", "exclude", UpstreamFeature.UNDO));
+        assertEquals("*", value("fast_access_bar_app_whitelist", "app", UpstreamFeature.QUICK_EMOJI));
+        assertEquals("1,2,3", value("emojify_enabled_patterns_in_order", "2", UpstreamFeature.MAGIC_EMOJI));
+        assertEquals(false, value("enable_emojify_model", true, UpstreamFeature.MAGIC_EMOJI));
+        assertEquals(true, value("enable_spellchecker_chips_ui", false, UpstreamFeature.PROOFREAD_CHIPS));
+        assertEquals(false, value("enable_emojify", false, UpstreamFeature.QUICK_EMOJI));
+        assertEquals("app", value("fast_access_bar_app_whitelist", "app", UpstreamFeature.MAGIC_EMOJI));
+        for (String key : new String[]{"google_sans_flex", "undo_stop_pk_handling", "enable_emojify_model", "enable_spellchecker_chips_ui"}) {
+            assertEquals(true, UpstreamFeature.transform(key, true, f -> false));
+            assertEquals(false, UpstreamFeature.transform(key, false, f -> false));
+        }
+        assertEquals(3L, UpstreamFeature.transform("undo_max_chunk", 3L, f -> false));
+        assertEquals("app", UpstreamFeature.transform("fast_access_bar_app_whitelist", "app", f -> false));
+    }
+
     private Object value(String key, Object original, UpstreamFeature selected) {
         return UpstreamFeature.transform(key, original, feature -> feature == selected);
     }
