@@ -98,6 +98,7 @@ public final class PixelBoardModule extends XposedModule {
                 +" extrasInstalled="+(FeatureConfig.extrasRequested() && getterInstalled));
         boolean roundedPreference = installNativePreferences(loader);
         RuntimeFeatureHooks.install(this, hostContext, loader);
+        RamblerUiHooks.install(this, hostContext, loader);
         CloudRuntimeStatus.send(hostContext,"EXTRAS",
                 "scanText="+FeatureConfig.scanText()+" screenshot="+FeatureConfig.screenshot()
                 +" roundedKeys="+FeatureConfig.roundedKeys()+" getter="+getterInstalled
