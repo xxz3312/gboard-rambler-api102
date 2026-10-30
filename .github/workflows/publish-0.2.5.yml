@@ -1,0 +1,104 @@
+name: Publish verified 0.2.5
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-0.2.5.yml']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-0.2.5
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Verify tested source and successful build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          git diff --exit-code 9b0b207618ac21793a2f117198f4b99479ce722b HEAD -- app build.gradle.kts settings.gradle.kts gradle.properties
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41049753873" > /tmp/verified-run.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          run=json.loads(Path('/tmp/verified-run.json').read_text())
+          assert run['head_sha']=='9b0b207618ac21793a2f117198f4b99479ce722b'
+          assert run['status']=='completed' and run['conclusion']=='success'
+          assert 'versionName = "0.2.5"' in Path('app/build.gradle.kts').read_text()
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: Gboard-Rambler-0.2.5
+          run-id: 41049753873
+          github-token: ${{ github.token }}
+          path: verified-build
+      - name: Verify exact APK and record released checksum
+        run: |
+          set -eu
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,re,shutil,zipfile
+          apks=list(Path('verified-build').rglob('Gboard-Rambler-API102-0.2.5.apk'))
+          assert len(apks)==1
+          apk=apks[0]
+          digest=hashlib.sha256(apk.read_bytes()).hexdigest()
+          assert digest=='e563e1f78a60e3d74e9a31fc44ec25c69e250e134fac039a3a709041223a77e3'
+          sums=list(Path('verified-build').rglob('SHA256SUMS'))
+          assert len(sums)==1
+          assert any(line.split()==[digest,apk.name] for line in sums[0].read_text().splitlines())
+          with zipfile.ZipFile(apk) as archive:
+              assert archive.read('META-INF/xposed/java_init.list').decode().strip()=='dev.kaede.pixelboard.PixelBoardModule'
+              assert archive.read('assets/licenses/GPL-3.0.txt')==Path('LICENSE').read_bytes()
+          Path('dist').mkdir(exist_ok=True)
+          shutil.copy2(apk,'dist/'+apk.name)
+          readme=Path('README.md')
+          text,count=re.subn(r'\d+(?:\.\d+)+ APK 的 SHA-256：\n\n```text\n[0-9a-f]{64}\n```',
+              '0.2.5 APK 的 SHA-256：\n\n```text\n'+digest+'\n```',readme.read_text(),count=1)
+          assert count==1
+          readme.write_text(text)
+          Path('/tmp/verified-apk-sha256').write_text(digest)
+          Path('/tmp/release-notes.md').write_text(Path('RELEASE_NOTES.md').read_text().split('\n',1)[1].strip()+'\n')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: record released 0.2.5 APK checksum"
+          git push origin HEAD:main
+      - name: Publish only verified APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > /tmp/existing-releases.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assert not any(r['tag_name']=='0.2.5' for r in json.loads(Path('/tmp/existing-releases.json').read_text()))
+          PY
+          gh release create 0.2.5 --repo "$GITHUB_REPOSITORY" --target "$(git rev-parse HEAD)" --title "0.2.5" --draft --notes-file /tmp/release-notes.md dist/Gboard-Rambler-API102-0.2.5.apk
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > /tmp/release-list.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          matches=[r for r in json.loads(Path('/tmp/release-list.json').read_text()) if r['tag_name']=='0.2.5']
+          assert len(matches)==1
+          release=matches[0]
+          assert release['draft'] and not release['prerelease'] and len(release['assets'])==1
+          asset=release['assets'][0]
+          assert asset['name']=='Gboard-Rambler-API102-0.2.5.apk' and asset['state']=='uploaded'
+          assert asset['digest']=='sha256:'+Path('/tmp/verified-apk-sha256').read_text()
+          Path('/tmp/verified-release-id').write_text(str(release['id']))
+          PY
+          RELEASE_ID="$(cat /tmp/verified-release-id)"
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -F draft=false -F prerelease=false -f make_latest=true > /tmp/published-release.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          release=json.loads(Path('/tmp/published-release.json').read_text())
+          assert release['tag_name']=='0.2.5' and not release['draft'] and not release['prerelease']
+          print(release['html_url'])
+          PY
