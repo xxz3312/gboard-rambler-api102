@@ -69,7 +69,7 @@ adb shell am start -n dev.kaede.pixelboard/.SettingsActivity
 adb shell pm enable dev.kaede.pixelboard/.Launcher
 ```
 
-本轮 0.2.3 测试构建同步 PixelBoard 1.3.3：新增 Google Sans 字体、撤销按钮、快捷表情栏、Magic Emoji、校对按钮及扩展校对应用范围开关，均默认关闭；Rambler 改用原生最小化路径。新增效果尚待实机验证，详见 [同步范围与限制](docs/UPSTREAM_1_3_3.md)。
+本轮 0.2.4 测试构建同步 PixelBoard 1.3.3：新增 Google Sans 字体、撤销按钮、快捷表情栏、Magic Emoji、校对按钮及扩展校对应用范围开关，均默认关闭；Rambler 改用原生最小化路径，并补齐按钮重排与 TalkBack 标签，按语义适配新提供的 18.4.6 APK。新增效果尚待实机验证，详见 [同步范围与限制](docs/UPSTREAM_1_3_3.md)。
 
 ## 构建
 
