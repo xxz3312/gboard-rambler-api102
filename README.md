@@ -1,4 +1,4 @@
-# Gboard Rambler — LSPosed API 102
+# Gboard Rambler
 
 将部分 PixelBoard 功能移植为 LSPosed 运行时模块，无需修改 Gboard 安装包。维护：Kaede。
 
@@ -13,6 +13,10 @@
 ```text
 e563e1f78a60e3d74e9a31fc44ec25c69e250e134fac039a3a709041223a77e3
 ```
+
+## 0.2.6
+
+修复 Gboard 18.5.6 的 Rambler 选择器及失败缓存；用户已确认恢复使用。运行诊断区分模块构建，旧记录不再用于判断兼容性。详见 [适配说明](docs/GBOARD_18_5_6.md)。
 
 ## 0.2 功能
 

@@ -14,7 +14,7 @@ public final class DiagnosticReport {
         StringBuilder report=new StringBuilder("Gboard Rambler 诊断日志\n");
         report.append("导出时间：").append(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z",java.util.Locale.US)
                 .format(new java.util.Date())).append('\n');
-        report.append("模块版本：").append(CloudRuntimeStatus.VERSION).append('\n');
+        report.append("模块版本：").append(CloudRuntimeStatus.VERSION).append("（构建 ").append(CloudRuntimeStatus.BUILD).append("）\n");
         report.append("设备：").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
                 .append(" / ").append(Build.DEVICE).append('\n');
         report.append("Android：").append(Build.VERSION.RELEASE).append(" / API ").append(Build.VERSION.SDK_INT).append('\n');

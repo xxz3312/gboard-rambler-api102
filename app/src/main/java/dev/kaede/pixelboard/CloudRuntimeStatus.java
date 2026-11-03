@@ -7,7 +7,8 @@ import android.os.Process;
 
 /** Metadata only. Receiving app authenticates the sender through Android 14+ identity. */
 public final class CloudRuntimeStatus extends BroadcastReceiver {
-    public static final String VERSION="0.2.5";
+    public static final String VERSION=BuildConfig.VERSION_NAME;
+    public static final int BUILD=BuildConfig.VERSION_CODE;
     private static final String PREF="cloud_runtime_status";
     public static void send(Context context,String event,String detail) {
         if(context==null||Build.VERSION.SDK_INT<34)return;
@@ -15,7 +16,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
             Intent intent=new Intent().setComponent(new ComponentName(
                     "dev.kaede.pixelboard","dev.kaede.pixelboard.CloudRuntimeStatus"));
             intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
-            intent.putExtra("event",event).putExtra("detail",detail).putExtra("version",VERSION)
+            intent.putExtra("event",event).putExtra("detail",detail).putExtra("version",VERSION).putExtra("build",BUILD)
                     .putExtra("pid",Process.myPid()).putExtra("when",System.currentTimeMillis());
             context.sendBroadcast(intent,null,BroadcastOptions.makeBasic().setShareIdentityEnabled(true).toBundle());
         } catch(RuntimeException|LinkageError ignored) {}
@@ -25,9 +26,9 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
         if(!"com.google.android.inputmethod.latin".equals(getSentFromPackage())||getSentFromUid()<0)return;
         try {
             int uid=context.getPackageManager().getPackageUid("com.google.android.inputmethod.latin",0);
-            if(uid!=getSentFromUid()||!VERSION.equals(intent.getStringExtra("version")))return;
+            if(uid!=getSentFromUid()||!sameBuild(intent.getStringExtra("version"),intent.getIntExtra("build",-1)))return;
             String event=intent.getStringExtra("event");
-            if(!"COMPAT".equals(event)&&!"INIT".equals(event)&&!"GETTER".equals(event)&&!"FLAG".equals(event)&&!"HOOKS".equals(event)&&!"ERROR".equals(event)&&!"EXTRAS".equals(event)&&!"EXTRA_FLAG".equals(event)&&!"UPSTREAM".equals(event)&&!"RUNTIME_HOOKS".equals(event)&&!"CLIPBOARD_SYNC".equals(event)&&!"CONFIG_APPLIED".equals(event)&&!"NATIVE_SETTINGS".equals(event)&&!"NATIVE_PREF".equals(event)&&!"RAMBLER_UI".equals(event)&&!"RAMBLER_UI_EVENT".equals(event)&&!"RAMBLER_SELECTION".equals(event)&&!"RAMBLER_FLAG".equals(event)&&!"RETENTION_READ".equals(event))return;
+            if(!"RESOLVER".equals(event)&&!"COMPAT".equals(event)&&!"INIT".equals(event)&&!"GETTER".equals(event)&&!"FLAG".equals(event)&&!"HOOKS".equals(event)&&!"ERROR".equals(event)&&!"EXTRAS".equals(event)&&!"EXTRA_FLAG".equals(event)&&!"UPSTREAM".equals(event)&&!"RUNTIME_HOOKS".equals(event)&&!"CLIPBOARD_SYNC".equals(event)&&!"CONFIG_APPLIED".equals(event)&&!"NATIVE_SETTINGS".equals(event)&&!"NATIVE_PREF".equals(event)&&!"RAMBLER_UI".equals(event)&&!"RAMBLER_UI_EVENT".equals(event)&&!"RAMBLER_SELECTION".equals(event)&&!"RAMBLER_FLAG".equals(event)&&!"RETENTION_READ".equals(event))return;
             String detail=intent.getStringExtra("detail");
             if(detail==null||detail.length()>480)return;
             android.content.SharedPreferences prefs=context.getSharedPreferences(PREF,0);
@@ -40,19 +41,25 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
                 if(!"ERROR".equals(event))return;
                 edit.clear();
             }
-            DiagnosticLog.record(context,event,"version="+VERSION+" pid="+pid+" "+detail);
-            edit.putInt("pid",pid).putString("version",VERSION)
+            DiagnosticLog.record(context,event,"version="+VERSION+" build="+BUILD+" pid="+pid+" "+detail);
+            edit.putInt("pid",pid).putString("version",VERSION).putInt("build",BUILD)
                     .putString(event,detail).putLong(event+"_when",intent.getLongExtra("when",0)).apply();
         } catch(Exception ignored) {}
     }
+    static boolean sameBuild(String version, int build) {
+        return VERSION.equals(version) && BUILD == build;
+    }
+    private static boolean current(android.content.SharedPreferences prefs) {
+        return sameBuild(prefs.getString("version", ""), prefs.getInt("build", -1));
+    }
     public static boolean retentionUnavailable(Context context) {
         android.content.SharedPreferences p=context.getSharedPreferences(PREF,0);
-        return VERSION.equals(p.getString("version",""))
+        return current(p)
                 && p.getString("RUNTIME_HOOKS","").contains("retentionCalculation=skipped");
     }
     public static boolean unsupported(Context context) {
         android.content.SharedPreferences p=context.getSharedPreferences(PREF,0);
-        return VERSION.equals(p.getString("version","")) && (
+        return current(p) && (
                 p.getString("COMPAT","").contains("false") || !p.getString("ERROR","").isEmpty()
                 || installationFailed(p.getString("HOOKS","")));
     }
@@ -63,11 +70,11 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
     }
     public static String report(Context context) {
         android.content.SharedPreferences p=context.getSharedPreferences(PREF,0);
-        if(!VERSION.equals(p.getString("version","")))return "尚未收到本版 Gboard 运行事件；不能据此判定版本不支持。请重启并唤起 Gboard，再刷新。";
+        if(!current(p))return "尚未收到当前构建的 Gboard 运行事件，旧构建记录不用于判断兼容性。请重启并唤起 Gboard，再刷新。";
         String capability=p.getString("COMPAT","");
         StringBuilder out=new StringBuilder();
-        if(capability.contains("rambler=false"))out.append("不支持该版本 Gboard：Rambler 未找到唯一匹配的 Hook 点。\n");
-        if(capability.contains("writing=false"))out.append("不支持该版本 Gboard：写作工具未找到唯一匹配的 Hook 点。\n");
+        if(capability.contains("rambler=false"))out.append("本次初始化未找到 Rambler 选择器；请查看 RESOLVER 诊断。\n");
+        if(capability.contains("writing=false"))out.append("本次初始化未找到写作工具 Hook 点；请查看诊断。\n");
         String hooks=p.getString("HOOKS","");
         String error=p.getString("ERROR","");
         if(!error.isEmpty())out.append("模块初始化失败；请查看 ERROR，不能据此判断后端可用性。\n");
@@ -76,7 +83,7 @@ public final class CloudRuntimeStatus extends BroadcastReceiver {
         else if(!capability.contains("false"))out.append("Hook 安装检查完成；云端功能仍需实际操作验证。\n");
         if(p.getString("RAMBLER_UI", "").startsWith("skipped:")) out.append("Rambler 按钮增强未安装，当前保留原生布局；详情见 RAMBLER_UI。\n");
         out.append("Gboard PID=").append(p.getInt("pid",-1)).append("\n");
-        for(String event:new String[]{"COMPAT","INIT","GETTER","HOOKS","ERROR","FLAG","EXTRAS","EXTRA_FLAG","UPSTREAM","RUNTIME_HOOKS","CLIPBOARD_SYNC","CONFIG_APPLIED","NATIVE_SETTINGS","NATIVE_PREF","RAMBLER_SELECTION","RAMBLER_FLAG","RAMBLER_UI","RAMBLER_UI_EVENT","RETENTION_READ"}) {
+        for(String event:new String[]{"COMPAT","RESOLVER","INIT","GETTER","HOOKS","ERROR","FLAG","EXTRAS","EXTRA_FLAG","UPSTREAM","RUNTIME_HOOKS","CLIPBOARD_SYNC","CONFIG_APPLIED","NATIVE_SETTINGS","NATIVE_PREF","RAMBLER_SELECTION","RAMBLER_FLAG","RAMBLER_UI","RAMBLER_UI_EVENT","RETENTION_READ"}) {
             String detail=p.getString(event,"");
             if(!detail.isEmpty()) {
                 long time=p.getLong(event+"_when",0);

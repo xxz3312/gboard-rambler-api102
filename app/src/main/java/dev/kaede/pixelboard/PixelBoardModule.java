@@ -81,6 +81,9 @@ public final class PixelBoardModule extends XposedModule {
         FeatureConfig.compatibility(voiceCompatible,writingCompatible);
         CloudRuntimeStatus.send(hostContext,"COMPAT","rambler="+voiceCompatible
                 +" writing="+writingCompatible+" resolver="+resolved.source);
+        CloudRuntimeStatus.send(hostContext,"RESOLVER","voice="
+                +(resolved.voice==null?"unresolved":resolved.voice.id)
+                +" scanFailure="+resolved.voiceFailure);
         CloudRuntimeStatus.send(hostContext,"INIT","rambler="+FeatureConfig.rambler()
                 +" writingTools="+FeatureConfig.writingTools()+" version="+gboardVersion(context));
         Log.i(TAG,"Compatibility rambler="+voiceCompatible+" writing="+writingCompatible

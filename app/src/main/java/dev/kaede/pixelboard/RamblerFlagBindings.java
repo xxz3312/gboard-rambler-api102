@@ -21,6 +21,7 @@ public final class RamblerFlagBindings {
         }
     }
     private static final String[][] CANDIDATES = {
+        {"18.5.6", "oki", "g", "a"},
         {"18.4.1", "odx", "g", "a"},
         {"18.3.1", "obw", "g", "a"},
         {"18.3.1", "acps", "g", "a"}
