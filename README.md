@@ -8,10 +8,10 @@
 
 [前往 Release 下载](https://github.com/xxz3312/gboard-rambler-api102/releases/latest)
 
-0.2.5 APK 的 SHA-256：
+0.2.6 APK 的 SHA-256：
 
 ```text
-e563e1f78a60e3d74e9a31fc44ec25c69e250e134fac039a3a709041223a77e3
+fbb075f951f5cf73b7dd95f79e3d8b2d345887540fff9247629d61a340003e0e
 ```
 
 ## 0.2.6
