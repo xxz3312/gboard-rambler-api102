@@ -11,7 +11,7 @@ import org.luckypray.dexkit.result.MethodData;
 
 /** Unique semantic matches; never force a result when signatures are ambiguous. */
 public final class GboardResolver {
-    private static final String REV = "semantic-cloud-2-splits";
+    private static final String REV = "semantic-cloud-3-retry-selector";
     private static final String VOICE = RamblerBindings.VOICE;
     private static final String EXTENSION =
             "com/google/android/apps/inputmethod/libs/agenticdictation/extension/AgenticDictationExtension";
@@ -21,8 +21,14 @@ public final class GboardResolver {
         public final RamblerBindings.Profile voice;
         public final boolean writing;
         public final String source;
+        public final String voiceFailure;
         Result(RamblerFlagBindings.Binding flags, RamblerBindings.Profile voice, boolean writing, String source) {
+            this(flags, voice, writing, source, "");
+        }
+        Result(RamblerFlagBindings.Binding flags, RamblerBindings.Profile voice, boolean writing,
+                String source, String voiceFailure) {
             this.flags=flags; this.voice=voice; this.writing=writing; this.source=source;
+            this.voiceFailure=voiceFailure.length()>320?voiceFailure.substring(0,320):voiceFailure;
         }
     }
     public static Result resolve(Context context, ClassLoader loader) {
@@ -31,7 +37,7 @@ public final class GboardResolver {
         RamblerFlagBindings.Binding knownFlags = RamblerFlagBindings.resolveUnique(loader);
         SharedPreferences cache = context.getSharedPreferences("pixelboard_semantic_cloud", 0);
         String key = fingerprint(context);
-        if (key.equals(cache.getString("key", ""))) {
+        if (cacheReusable(key, cache.getString("key", ""), cache.getBoolean("voice", false))) {
             try {
                 Method getter = Class.forName(cache.getString("getter_owner", ""), false, loader)
                         .getDeclaredMethod(cache.getString("getter_name", ""));
@@ -70,9 +76,13 @@ public final class GboardResolver {
                 boolean writing=hasString(bridge,"writing_tools") && hasString(bridge,"config_proofread")
                         && hasString(bridge,"writing_tools_enable_stable_entrance");
                 RamblerBindings.Profile voice;
+                String voiceFailure = "";
                 try { voice=resolveVoice(bridge,loader); }
                 catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
                     voice=knownVoice;
+                    voiceFailure = ignored.getClass().getSimpleName()+": "+ignored.getMessage();
+                    android.util.Log.w("PixelBoardLS", "Selector scan failed; validated signature fallback="
+                            +(voice!=null), ignored);
                 }
                 SharedPreferences.Editor edit=cache.edit().clear().putString("key",key)
                         .putString("getter_owner",getter.getDeclaringClass().getName())
@@ -87,15 +97,21 @@ public final class GboardResolver {
                                 .putString(prefix+"_args",String.join(",",method.arguments));
                     }
                 }
+                // A transient selector failure must never become a permanent negative cache.
+                if (voice == null) edit.remove("key");
                 edit.apply();
-                return new Result(flags,voice,writing,"semantic-scan");
+                return new Result(flags,voice,writing,"semantic-scan",voiceFailure);
             }
         } catch (Exception | LinkageError failure) {
             android.util.Log.w("PixelBoardLS","Semantic resolver failed; verified signatures only",failure);
             // This is a signature fallback, not a blanket version-number allowlist.
             return new Result(knownFlags,knownVoice,knownFlags!=null && knownVoice!=null
-                    && "18.4.1".equals(knownVoice.id),"verified-signature-fallback");
+                    && "18.4.1".equals(knownVoice.id),"verified-signature-fallback",
+                    failure.getClass().getSimpleName()+": "+failure.getMessage());
         }
+    }
+    static boolean cacheReusable(String current, String cached, boolean hasVoice) {
+        return hasVoice && current.equals(cached);
     }
     static String fingerprint(Context context) {
         android.content.pm.ApplicationInfo app=context.getApplicationInfo();
@@ -125,6 +141,11 @@ public final class GboardResolver {
     }
     static <T> T unique(List<T> candidates) {
         if(candidates.size()!=1) throw new IllegalArgumentException("Match count="+candidates.size());
+        return candidates.get(0);
+    }
+    static <T> T selectorUnique(List<T> candidates, String stage) {
+        if (candidates.size() != 1)
+            throw new IllegalArgumentException("selector stage="+stage+" matches="+candidates.size());
         return candidates.get(0);
     }
     private static boolean hasString(HostDex bridge,String value) {
@@ -184,8 +205,8 @@ public final class GboardResolver {
             Method method=data.getMethodInstance(loader);
             if(!Modifier.isStatic(method.getModifiers())&&Modifier.isPublic(method.getModifiers())) defaults.add(method);
         }
-        TargetMethod[] targets={target(unique(layouts)),target(unique(setups)),target(unique(creates)),
-                target(unique(writes)),target(unique(reads)),target(unique(defaults))};
+        TargetMethod[] targets={target(selectorUnique(layouts,"layout")),target(selectorUnique(setups,"setup")),target(selectorUnique(creates,"create")),
+                target(selectorUnique(writes,"write")),target(selectorUnique(reads,"read")),target(selectorUnique(defaults,"defaults"))};
         for(TargetMethod t:targets)t.resolve(loader);
         return new RamblerBindings.Profile("semantic-scan",targets);
     }

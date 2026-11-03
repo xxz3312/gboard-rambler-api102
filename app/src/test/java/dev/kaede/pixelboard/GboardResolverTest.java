@@ -51,4 +51,23 @@ public final class GboardResolverTest {
         }
         assertEquals("only",GboardResolver.unique(Collections.singletonList("only")));
     }
+    @Test public void negativeSelectorCacheIsAlwaysRetried() {
+        assertFalse(GboardResolver.cacheReusable("same-apk", "same-apk", false));
+        assertTrue(GboardResolver.cacheReusable("same-apk", "same-apk", true));
+        assertFalse(GboardResolver.cacheReusable("new-apk", "old-apk", true));
+    }
+    @Test public void selectorFailureNamesTheFailedStage() {
+        try {
+            GboardResolver.selectorUnique(Collections.emptyList(), "read");
+            fail();
+        } catch (IllegalArgumentException expected) {
+            assertEquals("selector stage=read matches=0", expected.getMessage());
+        }
+        try {
+            GboardResolver.selectorUnique(Arrays.asList("one", "two"), "setup");
+            fail();
+        } catch (IllegalArgumentException expected) {
+            assertEquals("selector stage=setup matches=2", expected.getMessage());
+        }
+    }
 }
