@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <queries><package android:name="com.google.android.inputmethod.latin"/></queries>
-    <application android:name=".ModuleApp" android:label="Gboard Rambler API102"
+    <application android:name=".ModuleApp" android:label="Gboard Rambler"
         android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.PixelBoard"
         android:description="@string/module_description" android:allowBackup="false">

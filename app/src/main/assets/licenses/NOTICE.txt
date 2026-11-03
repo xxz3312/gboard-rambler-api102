@@ -1,4 +1,4 @@
-Gboard Rambler API102
+Gboard Rambler
 Copyright (C) 2026 Kaede and contributors.
 
 This is an independent LSPosed API 102 runtime adaptation of:
