@@ -511,6 +511,8 @@ public final class RamblerDictationRuntimeTest {
         FakeSpan span = new FakeSpan(); span.c = "everyone"; span.j = action;
         FakeProto proto = new FakeProto(); proto.b = Collections.singletonList(span);
         Assert.assertTrue(RamblerDictationHooks.validProto(proto));
+        RamblerDictationRuntime.filterVoiceText(new FakeExtension(null, null, null), proto);
+        Assert.assertSame(diff, action.e);
         RamblerDictationRuntime.filterVoiceText(null, proto);
         Assert.assertSame(diff, action.e);
         Assert.assertEquals("everyone", span.c);

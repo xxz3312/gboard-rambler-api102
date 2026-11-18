@@ -65,32 +65,24 @@ public final class RamblerDictationRuntime {
                     Field iField = findField(extension.getClass(), "i");
                     Object oxs = iField != null ? iField.get(extension) : null;
                     if (oxs != null) {
-                        Method nMethod = findMethod(oxs.getClass(), "n");
-                        if (nMethod != null) {
-                            Object beforeCs = nMethod.invoke(oxs);
-                            if (beforeCs != null) {
-                                textBefore = beforeCs.toString();
-                            }
-                        }
-                        Method lMethod = findMethod(oxs.getClass(), "l");
-                        if (lMethod != null) {
-                            Object selCs = lMethod.invoke(oxs);
-                            if (selCs != null) {
-                                selectedText = selCs.toString();
-                            }
-                        }
-                        Method mMethod = findMethod(oxs.getClass(), "m");
-                        if (mMethod != null) {
-                            Object afterCs = mMethod.invoke(oxs);
-                            if (afterCs != null) {
-                                textAfter = afterCs.toString();
+                        Method before = findMethod(oxs.getClass(), "n");
+                        Method selected = findMethod(oxs.getClass(), "l");
+                        Method after = findMethod(oxs.getClass(), "m");
+                        if (before != null && selected != null && after != null) {
+                            Object beforeValue = before.invoke(oxs);
+                            Object selectedValue = selected.invoke(oxs);
+                            Object afterValue = after.invoke(oxs);
+                            if (beforeValue instanceof CharSequence
+                                    && selectedValue instanceof CharSequence
+                                    && afterValue instanceof CharSequence) {
+                                textBefore = beforeValue.toString();
+                                selectedText = selectedValue.toString();
+                                textAfter = afterValue.toString();
+                                contextKnown = true;
                             }
                         }
                     }
 
-                    if (oxs != null && findMethod(oxs.getClass(), "n") != null
-                            && findMethod(oxs.getClass(), "l") != null
-                            && findMethod(oxs.getClass(), "m") != null) contextKnown = true;
                     if (textBefore.isEmpty()) {
                         Method vMethod = findMethod(extension.getClass(), "v");
                         Object operator = vMethod != null ? vMethod.invoke(extension) : null;
@@ -191,8 +183,8 @@ public final class RamblerDictationRuntime {
                 // mistook newly spoken text at the end of the document for an edit of preceding text).
                 // In contrast, genuine mid-sentence edits (Issue #167, where cursor is placed mid-text
                 // or diff has a suffix) and explicit voice commands must retain their diffs.
-                boolean isErrantDiff = isErrantDictationDiff(
-                        action, transcript, textBefore, textAfter, selectedText, intent) && contextKnown;
+                boolean isErrantDiff = contextKnown && isErrantDictationDiff(
+                        action, transcript, textBefore, textAfter, selectedText, intent);
 
                 if (isErrantDiff) {
                     clearDiffField(action);
