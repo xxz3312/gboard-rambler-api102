@@ -45,7 +45,7 @@ final class RamblerDictationHooks {
                 return chain.proceed();
             });
             CloudRuntimeStatus.send(context, "DICTATION_REPAIR", "installed:upstream-1.3.5");
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+        } catch (RuntimeException | LinkageError error) {
             CloudRuntimeStatus.send(context, "DICTATION_REPAIR", "skipped:" + error.getClass().getSimpleName());
         }
     }
