@@ -26,7 +26,10 @@ final class RamblerUiHooks {
                     +binding.methods[HEADER_KEY].getDeclaringClass().getName()+" widget="
                     +binding.methods[WIDGET_KEY].getDeclaringClass().getName());
         } catch(Exception | LinkageError error) {
-            CloudRuntimeStatus.send(context,"RAMBLER_UI","skipped:"+error.getClass().getSimpleName()+"; native layout retained");
+            String reason=error.getMessage();
+            if (reason!=null && reason.length()>180) reason=reason.substring(0,180);
+            CloudRuntimeStatus.send(context,"RAMBLER_UI","skipped:"+error.getClass().getSimpleName()
+                    +(reason==null?"":": "+reason)+"; native layout retained");
             Log.w("PixelBoardLS","Rambler UI graph could not be installed; native layout retained",error);
         }
     }
