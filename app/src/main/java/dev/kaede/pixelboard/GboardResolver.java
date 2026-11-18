@@ -11,7 +11,7 @@ import org.luckypray.dexkit.result.MethodData;
 
 /** Unique semantic matches; never force a result when signatures are ambiguous. */
 public final class GboardResolver {
-    private static final String REV = "semantic-cloud-3-retry-selector";
+    private static final String REV = "semantic-cloud-4-upstream-135";
     private static final String VOICE = RamblerBindings.VOICE;
     private static final String EXTENSION =
             "com/google/android/apps/inputmethod/libs/agenticdictation/extension/AgenticDictationExtension";

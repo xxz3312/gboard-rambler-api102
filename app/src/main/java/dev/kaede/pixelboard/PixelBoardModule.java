@@ -39,7 +39,10 @@ public final class PixelBoardModule extends XposedModule {
                 if (arg instanceof Context && bootstrapped.compareAndSet(false, true)) {
                     Context appContext = (Context) arg;
                     if (GBOARD.equals(appContext.getPackageName())) {
-                        try { initializeForGboard(loader, appContext); }
+                        try { DirectBootGate.whenUnlocked(appContext, () -> {
+                            try { initializeForGboard(loader, appContext); }
+                            catch (Throwable error) { Log.e(TAG, "Gboard initialization failed", error); }
+                        }); }
                         catch (Throwable ex) {
                             CloudRuntimeStatus.send(appContext,"ERROR","initialization="+ex.getClass().getSimpleName());
                             Log.e(TAG, "Gboard pre-attach initialization failed", ex);
@@ -105,6 +108,7 @@ public final class PixelBoardModule extends XposedModule {
         boolean roundedPreference = installNativePreferences(loader);
         RuntimeFeatureHooks.install(this, hostContext, loader);
         RamblerUiHooks.install(this, hostContext, loader);
+        RamblerDictationHooks.install(this, hostContext, loader);
         CloudRuntimeStatus.send(hostContext,"EXTRAS",
                 "scanText="+FeatureConfig.scanText()+" screenshot="+FeatureConfig.screenshot()
                 +" roundedKeys="+FeatureConfig.roundedKeys()+" getter="+getterInstalled
@@ -216,6 +220,7 @@ public final class PixelBoardModule extends XposedModule {
                 Object receiver = chain.getThisObject();
                 if (receiver == null) return original;
                 try {
+                    if (FeatureConfig.rambler()) RamblerRotationGrace.ensureListening(hostContext);
                     String flag = binding.name(receiver);
                     if (!RamblerFlagPolicy.targeted(flag) && !WritingToolsFlagPolicy.targeted(flag) && !KeyboardFeaturePolicy.targeted(flag)) return original;
                     Context context = hostContext;

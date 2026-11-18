@@ -25,21 +25,28 @@ public final class RamblerFlagPolicy {
             "agentic_dictation_new_gi_motion",
             "enable_jetson_s3_quota_experiment_override",
             "agentic_dictation_disable_pre_session_quota_check",
-            "enable_pcm_audio_caching_for_offline_fallback",
-            "agentic_dictation_enable_seamless_fallback",
-            "agentic_dictation_enable_proactive_parallel_asr"
+            "enable_pcm_audio_caching_for_offline_fallback"
         ))
     );
     public static boolean targeted(String name) {
         return BOOLEAN_FLAGS.contains(name)
                 || "enable_rambler_al_toolbar".equals(name)
                 || "show_rambler_dict_settings".equals(name)
-                || "ad_activation_type".equals(name);
+                || "ad_activation_type".equals(name)
+                || "agentic_dictation_enable_seamless_fallback".equals(name)
+                || "agentic_dictation_enable_proactive_parallel_asr".equals(name)
+                || "agentic_dictation_deactivation_delay_ms".equals(name);
     }
     public static Object transform(String name, Object original, Context context) {
         if (!FeatureConfig.rambler() || name == null || context == null) return original;
         // Respect explicit opt-out across all flags, including activation type and settings.
         if (!RamblerSelection.mayExpose(context)) return original;
+        RamblerRotationGrace.ensureListening(context);
+        if ("agentic_dictation_enable_seamless_fallback".equals(name)
+                || "agentic_dictation_enable_proactive_parallel_asr".equals(name))
+            return original instanceof Boolean ? Boolean.FALSE : original;
+        if ("agentic_dictation_deactivation_delay_ms".equals(name))
+            return original instanceof Long ? Long.valueOf(RamblerRotationGrace.deactivationDelayMs()) : original;
         // Upstream 1.3.3 restores Gboard's native collapse/floating voice toolbar route.
         if ("enable_rambler_al_toolbar".equals(name))
             return original instanceof Boolean ? Boolean.FALSE : original;
