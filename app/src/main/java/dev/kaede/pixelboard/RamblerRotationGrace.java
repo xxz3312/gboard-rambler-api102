@@ -86,13 +86,17 @@ public final class RamblerRotationGrace {
         if (listening || context == null) {
             return;
         }
+        // The module can see flag reads inside Application.attachBaseContext, before
+        // an Application exists. Wait for it instead of caching an early registration failure.
+        Context application = context.getApplicationContext();
+        if (application == null) return;
         synchronized (LOCK) {
             if (listening) {
                 return;
             }
             try {
                 // Register before taking the baseline, so a change in between is not missed.
-                context.registerComponentCallbacks(new ComponentCallbacks() {
+                application.registerComponentCallbacks(new ComponentCallbacks() {
                     @Override
                     public void onConfigurationChanged(Configuration newConfig) {
                         record(newConfig);
@@ -102,7 +106,7 @@ public final class RamblerRotationGrace {
                     public void onLowMemory() {
                     }
                 });
-                record(context.getResources().getConfiguration());
+                record(application.getResources().getConfiguration());
             } catch (Throwable failure) {
                 logInfo("could not track display changes: " + failure);
             }
