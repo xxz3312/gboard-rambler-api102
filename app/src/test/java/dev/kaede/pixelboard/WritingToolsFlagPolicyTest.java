@@ -6,10 +6,12 @@ import static org.junit.Assert.*;
 public final class WritingToolsFlagPolicyTest {
     private static final String[] BASIC = {
         "config_proofread", "writing_tools", "enable_writing_tools_replace_button", "writing_tools_enable_stable_entrance", "enable_writing_tools_cooperative_mode",
-        "writing_helper_on_selected_text", "writing_helper_enable_text_stylization_internal",
-        "writing_helper", "enable_nga_lab_modeless_smartedit", "enable_writing_tools_voice_commands"
+        "writing_tools_replace_button", "writing_helper_enable_text_stylization_internal",
+        "writing_helper", "enable_writing_tools_voice_commands"
     };
     private static final String[] OFF = {
+        "writing_helper_on_selected_text", "enable_nga_lab_modeless_smartedit",
+        "enable_writing_tools_v2_tutorial_prompts",
         "enable_writing_tools_v2", "enable_writing_tools_v2_on_toolbar",
         "enable_writing_tools_suggest_style", "enable_writing_tools_my_style",
         "enable_writing_tools_my_style_plus", "writing_tools_v2",

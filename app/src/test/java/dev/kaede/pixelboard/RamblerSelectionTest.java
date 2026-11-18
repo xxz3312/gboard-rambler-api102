@@ -70,4 +70,20 @@ public final class RamblerSelectionTest {
         config.edit().clear().commit(); FeatureConfig.reload(config);
         assertEquals(true, RamblerFlagPolicy.transform(flag, true, context));
     }
+
+    @Test public void languageFallbackFlagsRespectOptOutAndOriginalTypes() {
+        SharedPreferences config = context.getSharedPreferences("language_test", 0);
+        config.edit().clear().putBoolean("rambler", true).commit();
+        FeatureConfig.reload(config); FeatureConfig.compatibility(true, true);
+        preferences.edit().putBoolean("enable_jetson", true).commit();
+        for (String flag : new String[]{"agentic_dictation_enable_seamless_fallback",
+                "agentic_dictation_enable_proactive_parallel_asr"}) {
+            assertEquals(false, RamblerFlagPolicy.transform(flag, true, context));
+            assertEquals(1L, RamblerFlagPolicy.transform(flag, 1L, context));
+            preferences.edit().putBoolean("enable_jetson", false).commit();
+            assertEquals(true, RamblerFlagPolicy.transform(flag, true, context));
+            preferences.edit().putBoolean("enable_jetson", true).commit();
+        }
+        config.edit().clear().commit(); FeatureConfig.reload(config);
+    }
 }
