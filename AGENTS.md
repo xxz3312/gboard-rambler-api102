@@ -4,6 +4,7 @@
 
 - Publish a Release only when the user explicitly requests publication.
 - Use plain numeric app versions (for example, 0.1.29).
+- Bump versionName and versionCode once per planned Release. Keep both values and the artifact version fixed across all subsequent fixes and test builds until that Release is published.
 - Release downloads must contain only APK files and the corresponding source code. GitHub's automatic source archives satisfy the source-download requirement.
 - Do not attach R8 mapping files, checksum text files, dependency reports, notices ZIPs, or other diagnostic files to Releases. Keep build diagnostics in CI artifacts when needed.
 - Display the released APK SHA-256 in README instead of attaching a checksum file.
