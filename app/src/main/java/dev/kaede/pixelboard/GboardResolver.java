@@ -11,7 +11,7 @@ import org.luckypray.dexkit.result.MethodData;
 
 /** Unique semantic matches; never force a result when signatures are ambiguous. */
 public final class GboardResolver {
-    private static final String REV = "semantic-cloud-4-upstream-135";
+    private static final String REV = "semantic-cloud-5-method-only";
     private static final String VOICE = RamblerBindings.VOICE;
     private static final String EXTENSION =
             "com/google/android/apps/inputmethod/libs/agenticdictation/extension/AgenticDictationExtension";
@@ -67,7 +67,8 @@ public final class GboardResolver {
                 for (MethodData candidate : bridge.findMethod(FindMethod.create().matcher(
                         MethodMatcher.create().returnType("java.lang.Object").paramCount(0)
                                 .usingStrings("Invalid flag: ")))) {
-                    Method method = candidate.getMethodInstance(loader);
+                    Method method = HostDex.reflectMethod(candidate,loader);
+                    if (method == null) continue;
                     try { binding(method,"semantic-scan"); getters.add(method); }
                     catch (ReflectiveOperationException | IllegalArgumentException ignored) {}
                 }
@@ -174,7 +175,8 @@ public final class GboardResolver {
         List<Method> setups=new ArrayList<>();
         for(MethodData data:bridge.findMethod(FindMethod.create().matcher(
                 MethodMatcher.create().declaredClass(VOICE).returnType("void").paramCount(0)))) {
-            Method method=data.getMethodInstance(loader);
+            Method method=HostDex.reflectMethod(data,loader);
+            if(method==null) continue;
             if(!Modifier.isPublic(method.getModifiers())||Modifier.isStatic(method.getModifiers())) continue;
             boolean superCall=false,unified=false;
             for(MethodData call:data.getInvokes()) {
@@ -194,7 +196,8 @@ public final class GboardResolver {
                     &&!call.getMethodName().equals(data.getMethodName())
                     &&call.getReturnTypeName().equals("boolean")
                     &&call.getParamTypeNames().equals(Collections.singletonList("android.content.Context"))) {
-                Method read=call.getMethodInstance(loader);
+                Method read=HostDex.reflectMethod(call,loader);
+                if(read==null) continue;
                 if(Modifier.isStatic(read.getModifiers())&&!reads.contains(read)) reads.add(read);
             }
         }
@@ -202,7 +205,8 @@ public final class GboardResolver {
         for(MethodData data:bridge.findMethod(FindMethod.create().matcher(
                 MethodMatcher.create().returnType("void").paramCount(0)
                         .usingStrings(EXTENSION,"onCreateExtension","pref_key_switch_to_muse")))) {
-            Method method=data.getMethodInstance(loader);
+            Method method=HostDex.reflectMethod(data,loader);
+            if(method==null) continue;
             if(!Modifier.isStatic(method.getModifiers())&&Modifier.isPublic(method.getModifiers())) defaults.add(method);
         }
         TargetMethod[] targets={target(selectorUnique(layouts,"layout")),target(selectorUnique(setups,"setup")),target(selectorUnique(creates,"create")),

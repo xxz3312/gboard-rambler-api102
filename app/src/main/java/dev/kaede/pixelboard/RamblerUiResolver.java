@@ -34,9 +34,10 @@ final class RamblerUiResolver {
     private RamblerUiResolver() {}
 
     static Binding resolve(Context context, ClassLoader loader) throws Exception {
-        String fingerprint="rambler-ui-1|"+GboardResolver.fingerprint(context);
+        String fingerprint="rambler-ui-2|"+GboardResolver.fingerprint(context);
         SharedPreferences cache=context.getSharedPreferences("pixelboard_rambler_ui",0);
         int slot=context.getResources().getIdentifier("key_pos_header_end_extra_key","id",context.getPackageName());
+        if (slot == 0) throw new IllegalArgumentException("UI missing extra key slot");
         Configuration cfg=new Configuration(context.getResources().getConfiguration()); cfg.setLocale(Locale.US);
         Resources english=context.createConfigurationContext(cfg).getResources();
         if (fingerprint.equals(cache.getString("fingerprint",""))) {
@@ -85,29 +86,41 @@ final class RamblerUiResolver {
                 if ("string".equals(english.getResourceTypeName(id)) && text.equals(english.getString(id))) selected=id;
             } catch(Resources.NotFoundException ignored) {}
         }
-        require(selected!=0); // Equal English labels are interchangeable; retain a native localized resource ID.
+        if (selected == 0) throw new IllegalArgumentException("UI missing label: " + text);
+        // Equal English labels are interchangeable; retain a native localized resource ID.
         return selected;
     }
     private static Class<?> owner(HostDex dex,ClassLoader loader,String anchor) throws Exception {
         Set<String> names=new HashSet<>();
         for(MethodData data:dex.findMethod(FindMethod.create().matcher(MethodMatcher.create().usingStrings(anchor))))
             if(data.getMethodName().equals("<clinit>")) names.add(data.getClassName());
-        return Class.forName(GboardResolver.unique(new ArrayList<>(names)),false,loader);
+        if (names.size() != 1)
+            throw new IllegalArgumentException("UI owner=" + anchor.substring(anchor.lastIndexOf('/')+1)
+                    + " matches=" + names.size());
+        return Class.forName(names.iterator().next(),false,loader);
     }
     private static List<MethodData> members(HostDex dex,Class<?> owner) {
-        return dex.findMethod(FindMethod.create().matcher(MethodMatcher.create().declaredClass(owner.getName())));
+        List<MethodData> methods = dex.findMethod(
+                FindMethod.create().matcher(MethodMatcher.create().declaredClass(owner.getName())));
+        methods.removeIf(data -> !HostDex.isMethodName(data.getMethodName()));
+        return methods;
     }
     private static boolean signature(MethodData data,String ret,String... args) {
-        return data.getReturnTypeName().equals(ret) && data.getParamTypeNames().equals(Arrays.asList(args));
+        return HostDex.isMethodName(data.getMethodName()) && data.getReturnTypeName().equals(ret) && data.getParamTypeNames().equals(Arrays.asList(args));
     }
-    private static Method reflect(MethodData data,ClassLoader loader) throws Exception { return data.getMethodInstance(loader); }
-    private static boolean calls(MethodData data,Method target,ClassLoader loader) throws Exception {
+    private static boolean calls(MethodData data,Method target,ClassLoader loader) {
         for(MethodData call:data.getInvokes())
             if(call.getMethodName().equals(target.getName()) && call.getClassName().equals(target.getDeclaringClass().getName())
-                    && reflect(call,loader).equals(target)) return true;
+                    && target.equals(HostDex.reflectMethod(call,loader))) return true;
         return false;
     }
-    private static Method unique(List<Method> values) { return GboardResolver.unique(new ArrayList<>(new LinkedHashSet<>(values))); }
+    private static Method unique(List<Method> values, String stage) {
+        Set<Method> methods = new LinkedHashSet<>(values);
+        methods.remove(null);
+        if (methods.size() != 1)
+            throw new IllegalArgumentException("UI stage=" + stage + " matches=" + methods.size());
+        return methods.iterator().next();
+    }
     private static Method[] scan(HostDex dex,ClassLoader loader) throws Exception {
         Class<?> base=owner(dex,loader,BASE), header=owner(dex,loader,HEADER);
         require(header.getSuperclass()==base);
@@ -116,41 +129,41 @@ final class RamblerUiResolver {
         for(MethodData data:baseMethods) if(data.getParamTypeNames().equals(Arrays.asList("int","java.lang.Runnable"))) {
             for(MethodData call:data.getInvokes())
                 if(call.getClassName().equals(base.getName()) && call.getParamTypeNames().equals(data.getParamTypeNames())
-                        && !call.getReturnTypeName().equals(data.getReturnTypeName())) factories.add(reflect(data,loader));
+                        && !call.getReturnTypeName().equals(data.getReturnTypeName())) factories.add(HostDex.reflectMethod(data,loader));
         }
-        Method[] m=new Method[12]; m[FACTORY]=unique(factories);
+        Method[] m=new Method[12]; m[FACTORY]=unique(factories, "factories");
         Class<?> key=m[FACTORY].getReturnType();
         List<Method> builders=new ArrayList<>(), closeKeys=new ArrayList<>();
         for(MethodData data:baseMethods) {
             if(data.getParamTypeNames().equals(Arrays.asList("int","java.lang.Runnable")) && !data.getReturnTypeName().equals(key.getName())
-                    && data.getUsingStrings().contains("ramble_close")) builders.add(reflect(data,loader));
-            if(signature(data,key.getName(),"int") && calls(data,m[FACTORY],loader)) closeKeys.add(reflect(data,loader));
+                    && data.getUsingStrings().contains("ramble_close")) builders.add(HostDex.reflectMethod(data,loader));
+            if(signature(data,key.getName(),"int") && calls(data,m[FACTORY],loader)) closeKeys.add(HostDex.reflectMethod(data,loader));
         }
-        m[BUILDER]=unique(builders); m[CLOSE_KEY]=unique(closeKeys);
+        m[BUILDER]=unique(builders, "builders"); m[CLOSE_KEY]=unique(closeKeys, "closeKeys");
         List<Method> labels=new ArrayList<>(), builds=new ArrayList<>(), icons=new ArrayList<>(), tears=new ArrayList<>(), adds=new ArrayList<>();
         for(MethodData data:baseMethods) {
-            if(reflectable(data) && data.getMethodName().equals(m[BUILDER].getName()))
-                for(MethodData call:data.getInvokes()) if(call.getClassName().equals(m[BUILDER].getReturnType().getName()) && signature(call,"void","int")) labels.add(reflect(call,loader));
-            if(reflectable(data) && data.getMethodName().equals(m[FACTORY].getName()))
-                for(MethodData call:data.getInvokes()) if(call.getClassName().equals(m[BUILDER].getReturnType().getName()) && signature(call,key.getName())) builds.add(reflect(call,loader));
-            if(signature(data,"int") && data.getUsingStrings().contains("pref_key_jetson_close_icon")) icons.add(reflect(data,loader));
+            if(data.getMethodName().equals(m[BUILDER].getName()))
+                for(MethodData call:data.getInvokes()) if(call.getClassName().equals(m[BUILDER].getReturnType().getName()) && signature(call,"void","int")) labels.add(HostDex.reflectMethod(call,loader));
+            if(data.getMethodName().equals(m[FACTORY].getName()))
+                for(MethodData call:data.getInvokes()) if(call.getClassName().equals(m[BUILDER].getReturnType().getName()) && signature(call,key.getName())) builds.add(HostDex.reflectMethod(call,loader));
+            if(signature(data,"int") && data.getUsingStrings().contains("pref_key_jetson_close_icon")) icons.add(HostDex.reflectMethod(data,loader));
             if(data.getUsingStrings().containsAll(Arrays.asList("ramble_close","ramble_retry","push_to_ramble"))
-                    && data.getReturnTypeName().equals("void") && data.getParamTypeNames().size()==3) tears.add(reflect(data,loader));
+                    && data.getReturnTypeName().equals("void") && data.getParamTypeNames().size()==3) tears.add(HostDex.reflectMethod(data,loader));
             for(MethodData call:data.getInvokes()) if(signature(call,"void","int",key.getName())) {
-                Method candidate=reflect(call,loader); if(Modifier.isStatic(candidate.getModifiers())) adds.add(candidate);
+                Method candidate=HostDex.reflectMethod(call,loader); if(candidate!=null && Modifier.isStatic(candidate.getModifiers())) adds.add(candidate);
             }
         }
-        m[LABEL]=unique(labels); m[BUILD]=unique(builds); m[CLOSE_ICON]=unique(icons); m[TEARDOWN]=unique(tears); m[ADD]=unique(adds);
+        m[LABEL]=unique(labels, "labels"); m[BUILD]=unique(builds, "builds"); m[CLOSE_ICON]=unique(icons, "icons"); m[TEARDOWN]=unique(tears, "tears"); m[ADD]=unique(adds, "adds");
         List<Method> removes=new ArrayList<>();
         for(MethodData data:baseMethods) if(data.getMethodName().equals(m[TEARDOWN].getName()))
             for(MethodData call:data.getInvokes()) if(signature(call,"void","int","java.lang.String")) {
-                Method candidate=reflect(call,loader); if(Modifier.isStatic(candidate.getModifiers())) removes.add(candidate);
+                Method candidate=HostDex.reflectMethod(call,loader); if(candidate!=null && Modifier.isStatic(candidate.getModifiers())) removes.add(candidate);
             }
-        m[REMOVE]=unique(removes);
+        m[REMOVE]=unique(removes, "removes");
         List<Method> headerKeys=new ArrayList<>(), widgetKeys=new ArrayList<>(), hides=new ArrayList<>();
         for(MethodData data:dex.findMethod(FindMethod.create().matcher(MethodMatcher.create().returnType(key.getName()).paramCount(0)))) {
-            Method candidate=reflect(data,loader);
-            if(candidate.getDeclaringClass().getSuperclass()!=base || !calls(data,m[FACTORY],loader) || !calls(data,m[CLOSE_KEY],loader)) continue;
+            Method candidate=HostDex.reflectMethod(data,loader);
+            if(candidate==null || candidate.getDeclaringClass().getSuperclass()!=base || !calls(data,m[FACTORY],loader) || !calls(data,m[CLOSE_KEY],loader)) continue;
             if(candidate.getDeclaringClass()==header) headerKeys.add(candidate); else widgetKeys.add(candidate);
         }
         for(MethodData data:members(dex,header)) if(signature(data,"void","android.view.ViewGroup","boolean")) {
@@ -159,12 +172,11 @@ final class RamblerUiResolver {
                 children |= call.getClassName().equals("android.view.ViewGroup") && call.getMethodName().equals("getChildCount");
                 animation |= call.getClassName().equals("android.view.View") && call.getMethodName().equals("animate");
             }
-            if(children && animation) hides.add(reflect(data,loader));
+            if(children && animation) hides.add(HostDex.reflectMethod(data,loader));
         }
-        m[HEADER_KEY]=unique(headerKeys); m[WIDGET_KEY]=unique(widgetKeys); m[HIDE]=unique(hides);
+        m[HEADER_KEY]=unique(headerKeys, "headerKeys"); m[WIDGET_KEY]=unique(widgetKeys, "widgetKeys"); m[HIDE]=unique(hides, "hides");
         return m;
     }
-    private static boolean reflectable(MethodData data) { return !data.getMethodName().startsWith("<"); }
     static void validate(Method[] m) {
         Class<?> base=m[FACTORY].getDeclaringClass(), key=m[FACTORY].getReturnType(), builder=m[BUILDER].getReturnType();
         require(base==m[BUILDER].getDeclaringClass() && key!=builder && !key.isPrimitive() && !builder.isPrimitive());

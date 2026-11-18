@@ -3,6 +3,7 @@ package dev.kaede.pixelboard;
 import android.content.Context;
 import java.util.*;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.zip.ZipFile;
 import org.luckypray.dexkit.DexKitBridge;
 import org.luckypray.dexkit.query.FindMethod;
@@ -37,6 +38,21 @@ final class HostDex implements AutoCloseable {
         }
         return new ArrayList<>(methods.values());
     }
+    // DexKit returns constructors and class initializers alongside methods.
+    static boolean isMethodName(String name) {
+        return !name.startsWith("<");
+    }
+
+    static Method reflectMethod(MethodData data, ClassLoader loader) {
+        if (!isMethodName(data.getMethodName())) return null;
+        try {
+            return data.getMethodInstance(loader);
+        } catch (ReflectiveOperationException | IllegalArgumentException | LinkageError ignored) {
+            // A candidate from an unavailable split must not invalidate other matches.
+            return null;
+        }
+    }
+
     @Override public void close() {
         for (DexKitBridge bridge : bridges) bridge.close();
         bridges.clear();
